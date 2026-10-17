@@ -1,0 +1,5 @@
+addin/bin/
+addin/obj/
+build-check/
+node_modules/
+*.user
