@@ -2,6 +2,12 @@
   "schemaVersion": 1,
   "project": "BIM-agent",
   "unitsPolicy": "Inspect project units before modeling; tool-specific units are explicit in descriptions.",
+  "agentHosts": [
+    { "name": "Expert OS", "priority": 1, "route": "native stdio MCP client", "status": "configuration-documented-not-live-tested" },
+    { "name": "Expert AI Terminal", "priority": 1, "route": "shell bridge", "status": "bridge-tested-product-not-live-tested" },
+    { "name": "Expert AI Terminal Pro", "priority": 1, "route": "shell bridge", "status": "bridge-tested-product-not-live-tested" },
+    { "name": "Expert AI Agent", "priority": 1, "route": "shell bridge", "status": "bridge-tested-product-not-live-tested" }
+  ],
   "adapters": [
     {
       "app": "Revit",

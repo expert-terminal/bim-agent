@@ -7,6 +7,8 @@ This repository connects AI coding agents to AEC and 3D software. Treat it as a 
 1. Read `README.md`, `capabilities.json`, `docs/PRO_WORKFLOWS.md`, and the tool reference for the target application.
 2. On Windows, run `./scripts/doctor.ps1`. Identify which host applications are installed and which connector builds are available. Ask the human to open the target application and a **disposable or backed-up** project before the first write.
 3. Connect the relevant local MCP server. Use `mcp/server.mjs` for Revit, `mcp/autocad.mjs` for AutoCAD, and `mcp/sketchup.mjs` for SketchUp. Do not assume a generic chat subscription exposes local MCP tools.
+   - In Expert OS, configure its stdio MCP client as shown in `docs/EXPERT_AI.md`.
+   - In Expert AI Terminal, Terminal Pro, or AI Agent, use `node scripts/bim-agent-cli.mjs <host> list` and call tools through the shell bridge when a native MCP client is unavailable.
 4. Call the application's status and read tools. Record the active file, units, levels/layers/tags, origin, existing types/components, and stable IDs. Never invent IDs or silently guess units.
 5. Propose a specific modeling plan with dimensions, element types, scope and validation checks. Execute small batches, approve in the host application, read back every result, and inspect the model visually.
 

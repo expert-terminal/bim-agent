@@ -14,6 +14,19 @@
 
 See [compatibility and limits](docs/COMPATIBILITY.md), [AutoCAD setup](docs/AUTOCAD.md), [SketchUp setup](docs/SKETCHUP.md), and [professional workflows](docs/PRO_WORKFLOWS.md).
 
+## Priority: Expert AI products
+
+**Expert AI Terminal, Expert AI Terminal Pro, Expert OS, and Expert AI Agent are priority agent hosts for BIM-agent.** Each can use the repository as an agent workspace and run the [shell bridge](scripts/bim-agent-cli.mjs) to discover and call every currently implemented BIM-agent tool. Expert OS additionally has a native stdio MCP client, so its model can receive the tools directly after configuration. Native MCP tool registration inside Terminal, Terminal Pro, and AI Agent has not yet been verified; the shell bridge is their documented integration path today. Host application coverage and modeling depth remain as shown in the table above.
+
+```powershell
+node scripts/bim-agent-cli.mjs revit list
+node scripts/bim-agent-cli.mjs revit revit_status
+# For a write tool, put its arguments in request.json:
+node scripts/bim-agent-cli.mjs revit revit_create_walls request.json
+```
+
+Read [Expert AI setup and evidence](docs/EXPERT_AI.md) for product-specific instructions. Any agent with local shell access can use this entry point; agents with an MCP client can connect to the corresponding `mcp/*.mjs` server directly.
+
 ## What an agent can do today
 
 | Tool | Purpose |
