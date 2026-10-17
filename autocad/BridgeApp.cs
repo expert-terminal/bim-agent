@@ -87,6 +87,9 @@ public sealed class BridgeApp : IExtensionApplication
             "layers" => ListLayers(doc),
             "entities" => ListEntities(doc, request),
             "create_lines" => CreateLines(doc, request),
+            "create_polylines" => CreatePolylines(doc, request),
+            "create_dimension" => CreateDimension(doc, request),
+            "create_text" => CreateText(doc, request),
             "create_layer" => CreateLayer(doc, request),
             "create_box" => CreateBox(doc, request),
             _ => throw new ArgumentException($"Unknown action: {action}")
@@ -158,6 +161,84 @@ public sealed class BridgeApp : IExtensionApplication
         tx.AddNewlyCreatedDBObject(layer, true);
         tx.Commit();
         return new { approved = true, name };
+    }
+
+    private static object CreatePolylines(Document doc, JsonElement request)
+    {
+        var items = request.GetProperty("polylines").EnumerateArray().ToArray();
+        if (items.Length is < 1 or > 50) throw new ArgumentException("Provide 1 to 50 polylines.");
+        var specs = items.Select(item =>
+        {
+            var vertices = item.GetProperty("points").EnumerateArray().Select(Point).ToArray();
+            var closed = item.TryGetProperty("closed", out var c) && c.GetBoolean();
+            if (vertices.Length < (closed ? 3 : 2) || vertices.Length > 200) throw new ArgumentException("Polyline needs 2–200 vertices (3 minimum when closed).");
+            if (vertices.Select(p => Math.Round(p.Z, 6)).Distinct().Count() != 1) throw new ArgumentException("Each 2D polyline must use one Z elevation.");
+            var layer = item.TryGetProperty("layer", out var l) ? l.GetString() : null;
+            return (Vertices: vertices, Closed: closed, Layer: layer);
+        }).ToArray();
+        if (!Confirm($"Create {specs.Length} polyline(s) in {doc.Name}? Coordinates use native drawing units."))
+            return new { approved = false, handles = Array.Empty<string>() };
+        using var tx = doc.Database.TransactionManager.StartTransaction();
+        var blockTable = (BlockTable)tx.GetObject(doc.Database.BlockTableId, OpenMode.ForRead);
+        var model = (BlockTableRecord)tx.GetObject(blockTable[BlockTableRecord.ModelSpace], OpenMode.ForWrite);
+        var layers = (LayerTable)tx.GetObject(doc.Database.LayerTableId, OpenMode.ForRead);
+        var handles = new List<string>();
+        foreach (var spec in specs)
+        {
+            if (spec.Layer is not null && !layers.Has(spec.Layer)) throw new ArgumentException($"Layer '{spec.Layer}' does not exist.");
+            var polyline = new Polyline { Closed = spec.Closed, Elevation = spec.Vertices[0].Z };
+            for (var i = 0; i < spec.Vertices.Length; i++)
+                polyline.AddVertexAt(i, new Point2d(spec.Vertices[i].X, spec.Vertices[i].Y), 0, 0, 0);
+            if (spec.Layer is not null) polyline.Layer = spec.Layer;
+            model.AppendEntity(polyline);
+            tx.AddNewlyCreatedDBObject(polyline, true);
+            handles.Add(polyline.Handle.ToString());
+        }
+        tx.Commit();
+        return new { approved = true, handles };
+    }
+
+    private static object CreateDimension(Document doc, JsonElement request)
+    {
+        var a = Point(request.GetProperty("start"));
+        var b = Point(request.GetProperty("end"));
+        var offset = request.GetProperty("offset").GetDouble();
+        if (Math.Abs(a.Z - b.Z) > 1e-6) throw new ArgumentException("Dimension endpoints must share one Z elevation.");
+        if (a.DistanceTo(b) < 1e-6 || !double.IsFinite(offset) || Math.Abs(offset) < 1e-6 || Math.Abs(offset) > 1_000_000)
+            throw new ArgumentException("Dimension endpoints and offset must be non-zero finite values within range.");
+        if (!Confirm($"Create a linear dimension between the supplied points in {doc.Name}? Drawing units are native."))
+            return new { approved = false, handle = (string?)null };
+        using var tx = doc.Database.TransactionManager.StartTransaction();
+        var blockTable = (BlockTable)tx.GetObject(doc.Database.BlockTableId, OpenMode.ForRead);
+        var model = (BlockTableRecord)tx.GetObject(blockTable[BlockTableRecord.ModelSpace], OpenMode.ForWrite);
+        var angle = Math.Atan2(b.Y - a.Y, b.X - a.X);
+        var midpoint = new Point3d((a.X + b.X) / 2, (a.Y + b.Y) / 2, a.Z);
+        var dimPoint = new Point3d(midpoint.X - Math.Sin(angle) * offset, midpoint.Y + Math.Cos(angle) * offset, midpoint.Z);
+        var dimension = new RotatedDimension(angle, a, b, dimPoint, string.Empty, doc.Database.Dimstyle);
+        model.AppendEntity(dimension);
+        tx.AddNewlyCreatedDBObject(dimension, true);
+        var handle = dimension.Handle.ToString();
+        tx.Commit();
+        return new { approved = true, handle };
+    }
+
+    private static object CreateText(Document doc, JsonElement request)
+    {
+        var position = Point(request.GetProperty("position"));
+        var value = request.GetProperty("text").GetString();
+        var height = Positive(request.GetProperty("height").GetDouble());
+        if (string.IsNullOrWhiteSpace(value) || value.Length > 2000) throw new ArgumentException("Text must contain 1–2000 characters.");
+        if (!Confirm($"Create text '{value[..Math.Min(value.Length, 80)]}' in {doc.Name}? Text height uses native drawing units."))
+            return new { approved = false, handle = (string?)null };
+        using var tx = doc.Database.TransactionManager.StartTransaction();
+        var table = (BlockTable)tx.GetObject(doc.Database.BlockTableId, OpenMode.ForRead);
+        var model = (BlockTableRecord)tx.GetObject(table[BlockTableRecord.ModelSpace], OpenMode.ForWrite);
+        var textEntity = new DBText { Position = position, Height = height, TextString = value };
+        model.AppendEntity(textEntity);
+        tx.AddNewlyCreatedDBObject(textEntity, true);
+        var handle = textEntity.Handle.ToString();
+        tx.Commit();
+        return new { approved = true, handle };
     }
 
     private static object CreateBox(Document doc, JsonElement request)

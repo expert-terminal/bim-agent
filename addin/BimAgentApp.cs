@@ -2,6 +2,7 @@ using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
 using Autodesk.Revit.DB;
+using Autodesk.Revit.DB.Structure;
 using Autodesk.Revit.UI;
 
 namespace BimAgent;
@@ -124,6 +125,25 @@ internal sealed class BridgeHandler : IExternalEventHandler
                 .OrderBy(x => x.Elevation).Select(x => new { id = x.Id.Value, name = x.Name, elevationMm = Math.Round(ToMm(x.Elevation), 2) }).ToArray(),
             "wall_types" => new FilteredElementCollector(doc).OfClass(typeof(WallType)).Cast<WallType>()
                 .OrderBy(x => x.Name).Select(x => new { id = x.Id.Value, name = x.Name, kind = x.Kind.ToString() }).ToArray(),
+            "floor_types" => new FilteredElementCollector(doc).OfClass(typeof(FloorType)).Cast<FloorType>()
+                .OrderBy(x => x.Name).Select(x => new { id = x.Id.Value, name = x.Name, family = x.FamilyName }).ToArray(),
+            "ceiling_types" => new FilteredElementCollector(doc).OfClass(typeof(CeilingType)).Cast<CeilingType>()
+                .OrderBy(x => x.Name).Select(x => new { id = x.Id.Value, name = x.Name, family = x.FamilyName }).ToArray(),
+            "roof_types" => new FilteredElementCollector(doc).OfClass(typeof(RoofType)).Cast<RoofType>()
+                .OrderBy(x => x.Name).Select(x => new { id = x.Id.Value, name = x.Name, family = x.FamilyName }).ToArray(),
+            "view_types" => new FilteredElementCollector(doc).OfClass(typeof(ViewFamilyType)).Cast<ViewFamilyType>()
+                .OrderBy(x => x.ViewFamily.ToString()).ThenBy(x => x.Name)
+                .Select(x => new { id = x.Id.Value, name = x.Name, viewFamily = x.ViewFamily.ToString() }).ToArray(),
+            "titleblock_types" => new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_TitleBlocks)
+                .WhereElementIsElementType().Cast<FamilySymbol>().OrderBy(x => x.FamilyName).ThenBy(x => x.Name)
+                .Select(x => new { id = x.Id.Value, family = x.FamilyName, name = x.Name }).ToArray(),
+            "rooms" => ListRooms(doc, request),
+            "schedule_categories" => ScheduleCategories(doc),
+            "schedule_fields" => ScheduleFields(doc, request),
+            "create_schedule" => CreateSchedule(doc, request),
+            "materials" => new FilteredElementCollector(doc).OfClass(typeof(Material)).Cast<Material>()
+                .OrderBy(x => x.Name).Take(Limit(request)).Select(x => new { id = x.Id.Value, name = x.Name, color = new[] { x.Color.Red, x.Color.Green, x.Color.Blue } }).ToArray(),
+            "model_health" => ModelHealth(doc, request),
             "views" => ListViews(doc, request),
             "sheets" => ListSheets(doc, request),
             "family_types" => ListFamilyTypes(doc, request),
@@ -131,6 +151,25 @@ internal sealed class BridgeHandler : IExternalEventHandler
             "elements" => ListElements(doc, request),
             "element" => InspectElement(doc, request),
             "create_walls" => CreateWalls(doc, request),
+            "load_family_type" => LoadFamilyType(doc, request),
+            "create_floors" => CreateFloors(doc, request),
+            "create_ceilings" => CreateCeilings(doc, request),
+            "create_roof" => CreateRoof(doc, request),
+            "place_family_instances" => PlaceFamilyInstances(doc, request),
+            "create_plan_view" => CreatePlanView(doc, request),
+            "place_view_on_sheet" => PlaceViewOnSheet(doc, request),
+            "create_3d_view" => Create3DView(doc, request),
+            "set_view_scale" => SetViewScale(doc, request),
+            "set_view_visibility" => SetViewVisibility(doc, request),
+            "tag_elements" => TagElements(doc, request),
+            "duplicate_view" => DuplicateView(doc, request),
+            "move_elements" => MoveElements(doc, request),
+            "change_element_type" => ChangeElementType(doc, request),
+            "rotate_elements" => RotateElements(doc, request),
+            "copy_elements" => CopyElements(doc, request),
+            "create_room" => CreateRoom(doc, request),
+            "export_sheets_pdf" => ExportSheetsPdf(doc, request),
+            "export_views_dwg" => ExportViewsDwg(doc, request),
             "create_level" => CreateLevel(doc, request),
             "create_grid" => CreateGrid(doc, request),
             "create_sheet" => CreateSheet(doc, request),
@@ -146,6 +185,83 @@ internal sealed class BridgeHandler : IExternalEventHandler
         var walls = new FilteredElementCollector(doc).OfClass(typeof(Wall)).Cast<Wall>();
         return walls.Take(limit).Select(w => new { id = w.Id.Value, name = w.Name, typeId = w.GetTypeId().Value,
             levelId = w.LevelId.Value, lengthMm = Math.Round(ToMm(w.get_Parameter(BuiltInParameter.CURVE_ELEM_LENGTH)?.AsDouble() ?? 0), 2) }).ToArray();
+    }
+
+    private static object ListRooms(Document doc, JsonElement request) =>
+        new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Rooms).WhereElementIsNotElementType()
+            .Cast<SpatialElement>().Take(Limit(request)).Select(room => new
+            {
+                id = room.Id.Value, name = room.Name,
+                number = room.get_Parameter(BuiltInParameter.ROOM_NUMBER)?.AsString(),
+                level = doc.GetElement(room.LevelId)?.Name,
+                areaSquareMetres = Math.Round(UnitUtils.ConvertFromInternalUnits(room.Area, UnitTypeId.SquareMeters), 3),
+                locationMm = (room.Location as LocationPoint) is { } location
+                    ? new[] { Math.Round(ToMm(location.Point.X), 1), Math.Round(ToMm(location.Point.Y), 1), Math.Round(ToMm(location.Point.Z), 1) }
+                    : null
+            }).ToArray();
+
+    private static object ModelHealth(Document doc, JsonElement request)
+    {
+        var limit = request.TryGetProperty("limit", out var value) ? Math.Clamp(value.GetInt32(), 1, 100) : 50;
+        var warnings = doc.GetWarnings().Take(limit).Select(w => new
+        {
+            description = w.GetDescriptionText(),
+            elementIds = w.GetFailingElements().Take(20).Select(id => id.Value).ToArray()
+        }).ToArray();
+        return new { warningCount = doc.GetWarnings().Count, warnings };
+    }
+
+    private static object ScheduleCategories(Document doc) => doc.Settings.Categories.Cast<Category>()
+        .Where(c => c.AllowsBoundParameters && ViewSchedule.IsValidCategoryForSchedule(c.Id))
+        .OrderBy(c => c.Name).Select(c => new { id = c.Id.Value, name = c.Name }).ToArray();
+
+    private static object ScheduleFields(Document doc, JsonElement request)
+    {
+        var categoryId = new ElementId(request.GetProperty("categoryId").GetInt64());
+        if (!ViewSchedule.IsValidCategoryForSchedule(categoryId)) throw new ArgumentException("categoryId is not schedulable.");
+        using var transaction = new Transaction(doc, "Agent: inspect schedule fields");
+        if (transaction.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start field inspection.");
+        try
+        {
+            var schedule = ViewSchedule.CreateSchedule(doc, categoryId);
+            var fields = schedule.Definition.GetSchedulableFields().Select(field => new
+            {
+                name = field.GetName(doc), parameterId = field.ParameterId.Value, fieldType = field.FieldType.ToString()
+            }).OrderBy(field => field.name).ToArray();
+            transaction.RollBack();
+            return new { categoryId = categoryId.Value, fields };
+        }
+        catch { if (transaction.HasStarted()) transaction.RollBack(); throw; }
+    }
+
+    private static object CreateSchedule(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        var categoryId = new ElementId(request.GetProperty("categoryId").GetInt64());
+        var name = RequiredName(request, "name", 100);
+        var fieldNames = request.GetProperty("fieldNames").EnumerateArray().Select(x => x.GetString() ?? "").ToArray();
+        if (fieldNames.Length is < 1 or > 30 || fieldNames.Any(string.IsNullOrWhiteSpace) || fieldNames.Distinct(StringComparer.OrdinalIgnoreCase).Count() != fieldNames.Length)
+            throw new ArgumentException("Provide 1 to 30 distinct non-empty schedule field names.");
+        if (!ViewSchedule.IsValidCategoryForSchedule(categoryId)) throw new ArgumentException("categoryId is not schedulable.");
+        if (!Confirm(doc, $"Create schedule '{name}' with {fieldNames.Length} fields for category ID {categoryId.Value}?"))
+            return new { approved = false, createdId = (long?)null };
+        using var tx = new Transaction(doc, "Agent: create schedule");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            var schedule = ViewSchedule.CreateSchedule(doc, categoryId);
+            var available = schedule.Definition.GetSchedulableFields();
+            foreach (var fieldName in fieldNames)
+            {
+                var matches = available.Where(f => string.Equals(f.GetName(doc), fieldName, StringComparison.OrdinalIgnoreCase)).ToArray();
+                if (matches.Length != 1) throw new ArgumentException($"Expected one schedulable field '{fieldName}', found {matches.Length}.");
+                schedule.Definition.AddField(matches[0]);
+            }
+            schedule.Name = name;
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the schedule.");
+            return new { approved = true, createdId = (long?)schedule.Id.Value, name = schedule.Name };
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
     }
 
     private static int Limit(JsonElement request) => request.TryGetProperty("limit", out var value)
@@ -221,15 +337,22 @@ internal sealed class BridgeHandler : IExternalEventHandler
         if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
         var number = RequiredName(request, "number", 50);
         var name = RequiredName(request, "name", 100);
+        var titleBlockId = request.TryGetProperty("titleBlockTypeId", out var titleBlockJson)
+            ? new ElementId(titleBlockJson.GetInt64()) : ElementId.InvalidElementId;
+        if (titleBlockId != ElementId.InvalidElementId &&
+            (doc.GetElement(titleBlockId) is not FamilySymbol titleBlock || titleBlock.Category?.Id.Value != (long)BuiltInCategory.OST_TitleBlocks))
+            throw new ArgumentException("titleBlockTypeId must identify a title block family type.");
         if (new FilteredElementCollector(doc).OfClass(typeof(ViewSheet)).Cast<ViewSheet>().Any(s => s.SheetNumber.Equals(number, StringComparison.OrdinalIgnoreCase)))
             throw new ArgumentException("A sheet with that number already exists.");
-        if (!Confirm(doc, $"Create sheet {number} — {name} without a title block?"))
+        if (!Confirm(doc, titleBlockId == ElementId.InvalidElementId
+                ? $"Create sheet {number} — {name} without a title block?"
+                : $"Create sheet {number} — {name} with title block type {titleBlockId.Value}?"))
             return new { approved = false, createdId = (long?)null };
         using var tx = new Transaction(doc, "Agent: create sheet");
         if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
         try
         {
-            var sheet = ViewSheet.Create(doc, ElementId.InvalidElementId);
+            var sheet = ViewSheet.Create(doc, titleBlockId);
             sheet.SheetNumber = number;
             sheet.Name = name;
             if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the sheet.");
@@ -298,7 +421,7 @@ internal sealed class BridgeHandler : IExternalEventHandler
         var parameter = matches[0];
         if (parameter.IsReadOnly) throw new InvalidOperationException("The parameter is read-only.");
         var value = request.GetProperty("value");
-        if (parameter.StorageType == StorageType.ElementId || parameter.StorageType == StorageType.None)
+        if (parameter.StorageType == StorageType.None)
             throw new ArgumentException("This parameter storage type is not supported for editing.");
         if (parameter.StorageType == StorageType.String && value.ValueKind != JsonValueKind.String ||
             parameter.StorageType == StorageType.Integer && value.ValueKind != JsonValueKind.Number ||
@@ -315,7 +438,8 @@ internal sealed class BridgeHandler : IExternalEventHandler
             {
                 StorageType.String => parameter.Set(value.GetString()),
                 StorageType.Integer => parameter.Set(value.GetInt32()),
-                StorageType.Double => parameter.SetValueString(value.GetString()),
+            StorageType.Double => parameter.SetValueString(value.GetString()),
+            StorageType.ElementId => SetElementIdParameter(doc, parameter, value),
                 _ => false
             };
             if (!changed) throw new InvalidOperationException("Revit rejected the parameter value.");
@@ -323,6 +447,15 @@ internal sealed class BridgeHandler : IExternalEventHandler
         }
         catch { if (tx.HasStarted()) tx.RollBack(); throw; }
         return new { approved = true, elementId = id.Value, parameterName = name, value = RawParameterValue(parameter) };
+    }
+
+    private static bool SetElementIdParameter(Document doc, Parameter parameter, JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt64(out var rawId))
+            throw new ArgumentException("Element ID parameters require an integer project element ID.");
+        var id = new ElementId(rawId);
+        if (rawId >= 0 && doc.GetElement(id) is null) throw new ArgumentException($"Referenced element ID {rawId} does not exist.");
+        return parameter.Set(id);
     }
 
     private static object DeleteElements(Document doc, JsonElement request)
@@ -413,6 +546,502 @@ internal sealed class BridgeHandler : IExternalEventHandler
         return new { approved = true, createdIds = ids };
     }
 
+    private static object CreateFloors(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        var items = request.GetProperty("floors").EnumerateArray().ToArray();
+        if (items.Length is < 1 or > 20) throw new ArgumentException("Provide 1 to 20 floor boundaries.");
+        var specs = new List<(string Name, ElementId Type, ElementId Level, List<XYZ> Points, double OffsetMm)>();
+        foreach (var item in items)
+        {
+            var typeId = new ElementId(item.GetProperty("floorTypeId").GetInt64());
+            var levelId = new ElementId(item.GetProperty("levelId").GetInt64());
+            if (doc.GetElement(typeId) is not FloorType) throw new ArgumentException($"Invalid floor type ID {typeId.Value}.");
+            if (doc.GetElement(levelId) is not Level level) throw new ArgumentException($"Invalid level ID {levelId.Value}.");
+            var points = item.GetProperty("pointsMm").EnumerateArray().Select(Point).ToList();
+            if (points.Count is < 3 or > 100) throw new ArgumentException("Each floor needs 3 to 100 XY boundary points.");
+            if (points[0].DistanceTo(points[^1]) < FromMm(1)) points.RemoveAt(points.Count - 1);
+            if (points.Count < 3 || points.DistinctBy(p => (Math.Round(p.X, 7), Math.Round(p.Y, 7))).Count() < 3)
+                throw new ArgumentException("Floor boundary must contain at least 3 unique points.");
+            points = points.Select(p => new XYZ(p.X, p.Y, level.Elevation)).ToList();
+            var offsetMm = item.TryGetProperty("offsetMm", out var offset) ? offset.GetDouble() : 0;
+            if (!double.IsFinite(offsetMm) || Math.Abs(offsetMm) > 100_000) throw new ArgumentException("Floor offset must be finite and within ±100,000 mm.");
+            specs.Add((item.TryGetProperty("name", out var name) ? name.GetString() ?? "Floor" : "Floor", typeId, levelId, points, offsetMm));
+        }
+        if (!Confirm(doc, $"Create {specs.Count} floor(s) from closed polygon boundaries? Area and bounds will be reported after creation."))
+            return new { approved = false, createdIds = Array.Empty<long>() };
+        using var tx = new Transaction(doc, "Agent: create floors");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        var created = new List<(Floor Floor, string Name)>();
+        try
+        {
+            foreach (var spec in specs)
+            {
+                var loop = new CurveLoop();
+                for (var i = 0; i < spec.Points.Count; i++)
+                    loop.Append(Line.CreateBound(spec.Points[i], spec.Points[(i + 1) % spec.Points.Count]));
+                var floor = Floor.Create(doc, new List<CurveLoop> { loop }, spec.Type, spec.Level);
+                var offsetParameter = floor.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM);
+                if (offsetParameter is { IsReadOnly: false }) offsetParameter.Set(FromMm(spec.OffsetMm));
+                created.Add((floor, spec.Name));
+            }
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the floors.");
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+        return new { approved = true, floors = created.Select(x => new
+        {
+            id = x.Floor.Id.Value, name = x.Name,
+            areaSquareMetres = Math.Round(UnitUtils.ConvertFromInternalUnits(x.Floor.get_Parameter(BuiltInParameter.HOST_AREA_COMPUTED)?.AsDouble() ?? 0, UnitTypeId.SquareMeters), 3)
+        }).ToArray() };
+    }
+
+    private static object CreateCeilings(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        var items = request.GetProperty("ceilings").EnumerateArray().ToArray();
+        if (items.Length is < 1 or > 20) throw new ArgumentException("Provide 1 to 20 ceiling boundaries.");
+        var specs = items.Select(item =>
+        {
+            var typeId = new ElementId(item.GetProperty("ceilingTypeId").GetInt64());
+            var levelId = new ElementId(item.GetProperty("levelId").GetInt64());
+            if (doc.GetElement(typeId) is not CeilingType) throw new ArgumentException($"Invalid ceiling type ID {typeId.Value}.");
+            if (doc.GetElement(levelId) is not Level level) throw new ArgumentException($"Invalid level ID {levelId.Value}.");
+            var points = item.GetProperty("pointsMm").EnumerateArray().Select(Point).ToList();
+            if (points.Count is < 3 or > 100) throw new ArgumentException("Each ceiling needs 3 to 100 XY boundary points.");
+            if (points[0].DistanceTo(points[^1]) < FromMm(1)) points.RemoveAt(points.Count - 1);
+            if (points.Count < 3) throw new ArgumentException("Ceiling boundary requires at least 3 unique points.");
+            var heightMm = item.TryGetProperty("heightAboveLevelMm", out var height) ? height.GetDouble() : 0;
+            if (!double.IsFinite(heightMm) || Math.Abs(heightMm) > 100_000) throw new ArgumentException("Ceiling height offset must be finite and within ±100,000 mm.");
+            return (Type: typeId, Level: levelId, Elevation: level.Elevation, Points: points, Height: heightMm);
+        }).ToArray();
+        if (!Confirm(doc, $"Create {specs.Length} ceiling(s) from closed XY polygons? Ceiling height offsets default to zero."))
+            return new { approved = false, createdIds = Array.Empty<long>() };
+        using var tx = new Transaction(doc, "Agent: create ceilings");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        var ids = new List<long>();
+        try
+        {
+            foreach (var spec in specs)
+            {
+                var pts = spec.Points.Select(p => new XYZ(p.X, p.Y, spec.Elevation)).ToList();
+                var loop = new CurveLoop();
+                for (var i = 0; i < pts.Count; i++) loop.Append(Line.CreateBound(pts[i], pts[(i + 1) % pts.Count]));
+                var ceiling = Ceiling.Create(doc, new List<CurveLoop> { loop }, spec.Type, spec.Level);
+                var heightParameter = ceiling.get_Parameter(BuiltInParameter.CEILING_HEIGHTABOVELEVEL_PARAM);
+                if (heightParameter is { IsReadOnly: false }) heightParameter.Set(FromMm(spec.Height));
+                ids.Add(ceiling.Id.Value);
+            }
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the ceilings.");
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+        return new { approved = true, createdIds = ids };
+    }
+
+    private static object CreateRoof(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        var typeId = new ElementId(request.GetProperty("roofTypeId").GetInt64());
+        var levelId = new ElementId(request.GetProperty("levelId").GetInt64());
+        var type = doc.GetElement(typeId) as RoofType ?? throw new ArgumentException("roofTypeId must identify a footprint roof type.");
+        var level = doc.GetElement(levelId) as Level ?? throw new ArgumentException("Invalid levelId.");
+        var points = request.GetProperty("pointsMm").EnumerateArray().Select(Point).ToList();
+        if (points.Count is < 3 or > 100) throw new ArgumentException("Roof footprint needs 3 to 100 XY boundary points.");
+        if (points[0].DistanceTo(points[^1]) < FromMm(1)) points.RemoveAt(points.Count - 1);
+        var slopeDegrees = request.GetProperty("slopeDegrees").GetDouble();
+        if (!double.IsFinite(slopeDegrees) || slopeDegrees < 0 || slopeDegrees > 89) throw new ArgumentException("slopeDegrees must be between 0 and 89.");
+        if (points.Count < 3) throw new ArgumentException("Roof footprint must have at least 3 unique points.");
+        if (!Confirm(doc, $"Create a footprint roof on '{level.Name}' using '{type.Name}' with {slopeDegrees}° slope on each edge?"))
+            return new { approved = false, createdId = (long?)null };
+        using var tx = new Transaction(doc, "Agent: create footprint roof");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            var footprint = doc.Application.Create.NewCurveArray();
+            for (var i = 0; i < points.Count; i++)
+                footprint.Append(Line.CreateBound(new XYZ(points[i].X, points[i].Y, level.Elevation), new XYZ(points[(i + 1) % points.Count].X, points[(i + 1) % points.Count].Y, level.Elevation)));
+            var roof = doc.Create.NewFootPrintRoof(footprint, level, type, out var mappings);
+            var iterator = mappings.ForwardIterator();
+            while (iterator.MoveNext())
+            {
+                if (iterator.Current is ModelCurve modelCurve)
+                {
+                    roof.set_DefinesSlope(modelCurve, true);
+                    roof.set_SlopeAngle(modelCurve, slopeDegrees * Math.PI / 180.0);
+                }
+            }
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the roof.");
+            return new { approved = true, createdId = (long?)roof.Id.Value, slopeDegrees };
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+    }
+
+    private static object PlaceFamilyInstances(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        var items = request.GetProperty("instances").EnumerateArray().ToArray();
+        if (items.Length is < 1 or > 50) throw new ArgumentException("Provide 1 to 50 family instances.");
+        var specs = items.Select(item =>
+        {
+            var typeId = new ElementId(item.GetProperty("familyTypeId").GetInt64());
+            var levelId = new ElementId(item.GetProperty("levelId").GetInt64());
+            var symbol = doc.GetElement(typeId) as FamilySymbol ?? throw new ArgumentException($"Invalid family type ID {typeId.Value}.");
+            if (doc.GetElement(levelId) is not Level) throw new ArgumentException($"Invalid level ID {levelId.Value}.");
+            var point = item.TryGetProperty("pointMm", out var p) ? Point3(p) : throw new ArgumentException("Each instance needs pointMm [x,y,z].");
+            Element? host = null;
+            if (item.TryGetProperty("hostWallId", out var hostJson) && hostJson.ValueKind == JsonValueKind.Number)
+                host = doc.GetElement(new ElementId(hostJson.GetInt64())) is Wall wall ? wall : throw new ArgumentException("hostWallId must identify a wall.");
+            return (Symbol: symbol, Level: levelId, Point: point, Host: host);
+        }).ToArray();
+        var summary = string.Join("\n", specs.Take(12).Select((x, i) =>
+            $"{i + 1}. {x.Symbol.FamilyName}: {x.Symbol.Name} at ({ToMm(x.Point.X):0}, {ToMm(x.Point.Y):0}, {ToMm(x.Point.Z):0}) mm"));
+        if (specs.Length > 12) summary += $"\n... and {specs.Length - 12} more";
+        if (!Confirm(doc, $"Place {specs.Length} family instance(s)?\n{summary}"))
+            return new { approved = false, createdIds = Array.Empty<long>() };
+        using var tx = new Transaction(doc, "Agent: place family instances");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        var ids = new List<long>();
+        try
+        {
+            foreach (var spec in specs)
+            {
+                if (!spec.Symbol.IsActive) spec.Symbol.Activate();
+                FamilyInstance instance = spec.Host is Wall wall
+                    ? doc.Create.NewFamilyInstance(spec.Point, spec.Symbol, wall, (Level)doc.GetElement(spec.Level)!, StructuralType.NonStructural)
+                    : doc.Create.NewFamilyInstance(spec.Point, spec.Symbol, (Level)doc.GetElement(spec.Level)!, StructuralType.NonStructural);
+                ids.Add(instance.Id.Value);
+            }
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the family instances.");
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+        return new { approved = true, createdIds = ids };
+    }
+
+    private static object LoadFamilyType(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        if (doc.IsModifiable) throw new InvalidOperationException("Family loading requires no open Revit transaction.");
+        var path = Path.GetFullPath(request.GetProperty("path").GetString() ?? "");
+        var typeName = RequiredName(request, "typeName", 100);
+        if (!path.EndsWith(".rfa", StringComparison.OrdinalIgnoreCase) || !File.Exists(path))
+            throw new ArgumentException("path must identify an existing Revit family (.rfa) file.");
+        if (!Confirm(doc, $"Load family type '{typeName}' from:\n{path}? This adds the family content to the project."))
+            return new { approved = false, familyTypeId = (long?)null };
+        if (!doc.LoadFamilySymbol(path, typeName, out var symbol) || symbol is null)
+            throw new InvalidOperationException($"Revit could not load type '{typeName}' from the selected family file.");
+        return new { approved = true, family = symbol.FamilyName, type = symbol.Name, familyTypeId = (long?)symbol.Id.Value };
+    }
+
+    private static object CreatePlanView(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        var typeId = new ElementId(request.GetProperty("viewFamilyTypeId").GetInt64());
+        var levelId = new ElementId(request.GetProperty("levelId").GetInt64());
+        var name = RequiredName(request, "name", 100);
+        if (doc.GetElement(typeId) is not ViewFamilyType type || type.ViewFamily is not (ViewFamily.FloorPlan or ViewFamily.CeilingPlan or ViewFamily.StructuralPlan))
+            throw new ArgumentException("viewFamilyTypeId must be a floor, ceiling, or structural plan view type.");
+        if (doc.GetElement(levelId) is not Level) throw new ArgumentException("Invalid level ID.");
+        if (!Confirm(doc, $"Create {type.ViewFamily} view '{name}' on level {doc.GetElement(levelId)!.Name}?")) return new { approved = false, createdId = (long?)null };
+        using var tx = new Transaction(doc, "Agent: create plan view");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            var view = ViewPlan.Create(doc, typeId, levelId);
+            view.Name = name;
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the view.");
+            return new { approved = true, createdId = (long?)view.Id.Value, name = view.Name, viewType = view.ViewType.ToString() };
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+    }
+
+    private static object PlaceViewOnSheet(Document doc, JsonElement request)
+    {
+        var sheetId = new ElementId(request.GetProperty("sheetId").GetInt64());
+        var viewId = new ElementId(request.GetProperty("viewId").GetInt64());
+        var sheet = doc.GetElement(sheetId) as ViewSheet ?? throw new ArgumentException("Invalid sheetId.");
+        var view = doc.GetElement(viewId) as View ?? throw new ArgumentException("Invalid viewId.");
+        if (!Viewport.CanAddViewToSheet(doc, sheetId, viewId)) throw new ArgumentException("This view cannot be placed on that sheet (it may already be placed or be a schedule).");
+        var x = request.GetProperty("xMm").GetDouble(); var y = request.GetProperty("yMm").GetDouble();
+        if (!double.IsFinite(x) || !double.IsFinite(y) || Math.Abs(x) > 5000 || Math.Abs(y) > 5000) throw new ArgumentException("Sheet coordinates must be finite and within ±5000 mm.");
+        if (!Confirm(doc, $"Place view '{view.Name}' on sheet {sheet.SheetNumber} at ({x}, {y}) mm from the sheet origin?")) return new { approved = false, viewportId = (long?)null };
+        using var tx = new Transaction(doc, "Agent: place view on sheet");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            var viewport = Viewport.Create(doc, sheetId, viewId, new XYZ(FromMm(x), FromMm(y), 0));
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the viewport.");
+            return new { approved = true, viewportId = (long?)viewport.Id.Value, sheetId = sheetId.Value, viewId = viewId.Value };
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+    }
+
+    private static object Create3DView(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        var typeId = new ElementId(request.GetProperty("viewFamilyTypeId").GetInt64());
+        var name = RequiredName(request, "name", 100);
+        if (doc.GetElement(typeId) is not ViewFamilyType type || type.ViewFamily != ViewFamily.ThreeDimensional)
+            throw new ArgumentException("viewFamilyTypeId must identify a 3D view family type.");
+        if (!Confirm(doc, $"Create isometric 3D view '{name}' using type '{type.Name}'?"))
+            return new { approved = false, createdId = (long?)null };
+        using var tx = new Transaction(doc, "Agent: create 3D view");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            var view = View3D.CreateIsometric(doc, typeId);
+            view.Name = name;
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the 3D view.");
+            return new { approved = true, createdId = (long?)view.Id.Value, name = view.Name };
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+    }
+
+    private static object SetViewScale(Document doc, JsonElement request)
+    {
+        var view = doc.GetElement(new ElementId(request.GetProperty("viewId").GetInt64())) as View
+            ?? throw new ArgumentException("Invalid viewId.");
+        var scale = request.GetProperty("scale").GetInt32();
+        if (view.IsTemplate || scale is < 1 or > 10000) throw new ArgumentException("Choose a non-template view and a scale from 1 to 10000.");
+        if (!Confirm(doc, $"Set view '{view.Name}' scale to 1:{scale}?"))
+            return new { approved = false, viewId = view.Id.Value };
+        using var tx = new Transaction(doc, "Agent: set view scale");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            view.Scale = scale;
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the view scale.");
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+        return new { approved = true, viewId = view.Id.Value, scale = view.Scale };
+    }
+
+    private static object SetViewVisibility(Document doc, JsonElement request)
+    {
+        var view = doc.GetElement(new ElementId(request.GetProperty("viewId").GetInt64())) as View
+            ?? throw new ArgumentException("Invalid viewId.");
+        if (view.IsTemplate) throw new ArgumentException("Choose a view, not a view template.");
+        var rawIds = request.GetProperty("elementIds").EnumerateArray().Select(x => x.GetInt64()).ToArray();
+        if (rawIds.Length is < 1 or > 100 || rawIds.Distinct().Count() != rawIds.Length) throw new ArgumentException("Provide 1 to 100 distinct element IDs.");
+        var ids = rawIds.Select(x => new ElementId(x)).ToList();
+        foreach (var id in ids) if (doc.GetElement(id) is null) throw new ArgumentException($"Element {id.Value} not found.");
+        var hide = request.GetProperty("hidden").GetBoolean();
+        if (!Confirm(doc, $"{(hide ? "Hide" : "Show")} {ids.Count} element(s) in view '{view.Name}'?"))
+            return new { approved = false, viewId = view.Id.Value };
+        using var tx = new Transaction(doc, "Agent: set view element visibility");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            if (hide) view.HideElements(ids); else view.UnhideElements(ids);
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit view visibility.");
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+        return new { approved = true, viewId = view.Id.Value, hidden = hide, elementIds = rawIds };
+    }
+
+    private static object TagElements(Document doc, JsonElement request)
+    {
+        var view = doc.GetElement(new ElementId(request.GetProperty("viewId").GetInt64())) as View
+            ?? throw new ArgumentException("Invalid viewId.");
+        if (view.IsTemplate || (view is View3D view3d && !view3d.IsLocked)) throw new ArgumentException("Choose a non-template 2D view or a locked 3D view.");
+        var tagTypeId = new ElementId(request.GetProperty("tagTypeId").GetInt64());
+        var tagType = doc.GetElement(tagTypeId) as FamilySymbol ?? throw new ArgumentException("tagTypeId must identify a tag family type.");
+        var items = request.GetProperty("tags").EnumerateArray().ToArray();
+        if (items.Length is < 1 or > 50) throw new ArgumentException("Provide 1 to 50 tags.");
+        var specs = items.Select(item =>
+        {
+            var id = new ElementId(item.GetProperty("elementId").GetInt64());
+            var element = doc.GetElement(id) ?? throw new ArgumentException($"Element {id.Value} not found.");
+            var point = Point3(item.GetProperty("headMm"));
+            return (Element: element, Point: point);
+        }).ToArray();
+        if (!Confirm(doc, $"Place {specs.Length} '{tagType.FamilyName}: {tagType.Name}' tag(s) in view '{view.Name}'?"))
+            return new { approved = false, createdIds = Array.Empty<long>() };
+        using var tx = new Transaction(doc, "Agent: tag elements");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        var created = new List<long>();
+        try
+        {
+            foreach (var spec in specs)
+            {
+                var tag = IndependentTag.Create(doc, tagTypeId, view.Id, new Reference(spec.Element), true, TagOrientation.Horizontal, spec.Point);
+                created.Add(tag.Id.Value);
+            }
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the tags.");
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+        return new { approved = true, createdIds = created };
+    }
+
+    private static object DuplicateView(Document doc, JsonElement request)
+    {
+        var id = new ElementId(request.GetProperty("viewId").GetInt64());
+        var source = doc.GetElement(id) as View ?? throw new ArgumentException("Invalid viewId.");
+        var name = RequiredName(request, "name", 100);
+        var option = request.TryGetProperty("withDetailing", out var detailed) && detailed.GetBoolean()
+            ? ViewDuplicateOption.WithDetailing : ViewDuplicateOption.Duplicate;
+        if (!source.CanViewBeDuplicated(option)) throw new ArgumentException("This view cannot be duplicated with the requested option.");
+        if (!Confirm(doc, $"Duplicate view '{source.Name}' as '{name}'?")) return new { approved = false, createdId = (long?)null };
+        using var tx = new Transaction(doc, "Agent: duplicate view");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            var copy = (View)doc.GetElement(source.Duplicate(option))!;
+            copy.Name = name;
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the duplicated view.");
+            return new { approved = true, createdId = (long?)copy.Id.Value, name = copy.Name };
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+    }
+
+    private static object MoveElements(Document doc, JsonElement request)
+    {
+        var raw = request.GetProperty("elementIds").EnumerateArray().Select(v => v.GetInt64()).ToArray();
+        if (raw.Length is < 1 or > 50 || raw.Distinct().Count() != raw.Length) throw new ArgumentException("Provide 1 to 50 distinct element IDs.");
+        var ids = raw.Select(x => new ElementId(x)).ToArray();
+        foreach (var id in ids) if (doc.GetElement(id) is null) throw new ArgumentException($"Element {id.Value} not found.");
+        var delta = Point3(request.GetProperty("deltaMm"));
+        if (delta.GetLength() < FromMm(0.1)) throw new ArgumentException("Movement must be at least 0.1 mm.");
+        if (!Confirm(doc, $"Move {ids.Length} element(s) by ({ToMm(delta.X):0.##}, {ToMm(delta.Y):0.##}, {ToMm(delta.Z):0.##}) mm?"))
+            return new { approved = false, movedIds = Array.Empty<long>() };
+        using var tx = new Transaction(doc, "Agent: move elements");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            ElementTransformUtils.MoveElements(doc, ids, delta);
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the movement.");
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+        return new { approved = true, movedIds = raw };
+    }
+
+    private static object RotateElements(Document doc, JsonElement request)
+    {
+        var rawIds = request.GetProperty("elementIds").EnumerateArray().Select(x => x.GetInt64()).ToArray();
+        if (rawIds.Length is < 1 or > 50 || rawIds.Distinct().Count() != rawIds.Length) throw new ArgumentException("Provide 1 to 50 distinct element IDs.");
+        var ids = rawIds.Select(x => new ElementId(x)).ToList();
+        foreach (var id in ids) if (doc.GetElement(id) is null) throw new ArgumentException($"Element {id.Value} not found.");
+        var pivot = Point3(request.GetProperty("pivotMm"));
+        var degrees = request.GetProperty("degrees").GetDouble();
+        if (!double.IsFinite(degrees) || Math.Abs(degrees) > 36000) throw new ArgumentException("Rotation must be finite and within ±36,000 degrees.");
+        if (Math.Abs(degrees) < 0.001) throw new ArgumentException("Rotation must be at least 0.001 degrees.");
+        if (!Confirm(doc, $"Rotate {ids.Count} element(s) around vertical axis at ({ToMm(pivot.X):0}, {ToMm(pivot.Y):0}, {ToMm(pivot.Z):0}) mm by {degrees}°?"))
+            return new { approved = false, rotatedIds = Array.Empty<long>() };
+        using var tx = new Transaction(doc, "Agent: rotate elements");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            var axis = Line.CreateBound(pivot, pivot + XYZ.BasisZ);
+            ElementTransformUtils.RotateElements(doc, ids, axis, degrees * Math.PI / 180.0);
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the rotation.");
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+        return new { approved = true, rotatedIds = rawIds };
+    }
+
+    private static object CopyElements(Document doc, JsonElement request)
+    {
+        var rawIds = request.GetProperty("elementIds").EnumerateArray().Select(x => x.GetInt64()).ToArray();
+        if (rawIds.Length is < 1 or > 50 || rawIds.Distinct().Count() != rawIds.Length) throw new ArgumentException("Provide 1 to 50 distinct element IDs.");
+        var ids = rawIds.Select(x => new ElementId(x)).ToList();
+        foreach (var id in ids) if (doc.GetElement(id) is null) throw new ArgumentException($"Element {id.Value} not found.");
+        var delta = Point3(request.GetProperty("deltaMm"));
+        if (delta.GetLength() < FromMm(0.1)) throw new ArgumentException("Copy displacement must be at least 0.1 mm.");
+        if (!Confirm(doc, $"Copy {ids.Count} element(s) by ({ToMm(delta.X):0.##}, {ToMm(delta.Y):0.##}, {ToMm(delta.Z):0.##}) mm?"))
+            return new { approved = false, createdIds = Array.Empty<long>() };
+        using var tx = new Transaction(doc, "Agent: copy elements");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        ICollection<ElementId> created;
+        try
+        {
+            created = ElementTransformUtils.CopyElements(doc, ids, delta);
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the copy.");
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+        return new { approved = true, sourceIds = rawIds, createdIds = created.Select(x => x.Value).ToArray() };
+    }
+
+    private static object ChangeElementType(Document doc, JsonElement request)
+    {
+        var id = new ElementId(request.GetProperty("elementId").GetInt64());
+        var typeId = new ElementId(request.GetProperty("typeId").GetInt64());
+        var element = doc.GetElement(id) ?? throw new ArgumentException("Element not found.");
+        if (doc.GetElement(typeId) is not ElementType type) throw new ArgumentException("typeId must identify an element type.");
+        if (!Confirm(doc, $"Change element {id.Value} ({element.Category?.Name}) to type '{type.Name}'?")) return new { approved = false, elementId = id.Value };
+        using var tx = new Transaction(doc, "Agent: change element type");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        ElementId oldType;
+        try
+        {
+            oldType = element.GetTypeId();
+            var rejected = element.ChangeTypeId(typeId);
+            if (rejected != ElementId.InvalidElementId) throw new InvalidOperationException($"Revit rejected the type change; replacement element ID {rejected.Value} was returned.");
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the type change.");
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+        return new { approved = true, elementId = id.Value, previousTypeId = oldType.Value, typeId = typeId.Value };
+    }
+
+    private static object CreateRoom(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        var levelId = new ElementId(request.GetProperty("levelId").GetInt64());
+        var level = doc.GetElement(levelId) as Level ?? throw new ArgumentException("Invalid levelId.");
+        var u = request.GetProperty("pointMm")[0].GetDouble(); var v = request.GetProperty("pointMm")[1].GetDouble();
+        if (!double.IsFinite(u) || !double.IsFinite(v) || Math.Abs(u) > 1_000_000 || Math.Abs(v) > 1_000_000) throw new ArgumentException("Room point must be finite and within ±1,000,000 mm.");
+        if (!Confirm(doc, $"Place a room on level '{level.Name}' at ({u}, {v}) mm? Revit must find an enclosed room boundary.")) return new { approved = false, createdId = (long?)null };
+        using var tx = new Transaction(doc, "Agent: create room");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            var room = doc.Create.NewRoom(level, new UV(FromMm(u), FromMm(v)));
+            if (room is null) throw new InvalidOperationException("Revit could not create a room at that point. Confirm an enclosed boundary exists.");
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the room.");
+            return new { approved = true, createdId = (long?)room.Id.Value, number = room.get_Parameter(BuiltInParameter.ROOM_NUMBER)?.AsString(), areaSquareMetres = Math.Round(UnitUtils.ConvertFromInternalUnits(room.Area, UnitTypeId.SquareMeters), 3) };
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+    }
+
+    private static object ExportSheetsPdf(Document doc, JsonElement request)
+    {
+        var rawIds = request.GetProperty("sheetIds").EnumerateArray().Select(x => x.GetInt64()).ToArray();
+        if (rawIds.Length is < 1 or > 100 || rawIds.Distinct().Count() != rawIds.Length)
+            throw new ArgumentException("Provide 1 to 100 distinct sheet IDs.");
+        var ids = rawIds.Select(x => new ElementId(x)).ToList();
+        foreach (var id in ids) if (doc.GetElement(id) is not ViewSheet) throw new ArgumentException($"Element {id.Value} is not a sheet.");
+        var folder = Path.GetFullPath(request.GetProperty("folder").GetString() ?? "");
+        if (!Directory.Exists(folder)) throw new ArgumentException("The output folder must already exist.");
+        var fileName = RequiredName(request, "fileName", 160);
+        fileName = Path.GetFileNameWithoutExtension(fileName);
+        if (string.IsNullOrWhiteSpace(fileName) || fileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            throw new ArgumentException("fileName must be a valid file name.");
+        var output = Path.Combine(folder, fileName + ".pdf");
+        var overwrite = File.Exists(output);
+        if (!Confirm(doc, $"Export {ids.Count} sheet(s) to one PDF?\n{output}" +
+            (overwrite ? "\nAn existing file will be replaced." : "") +
+            "\nPDF export is an external file operation and is not part of Revit Undo."))
+            return new { approved = false, outputPath = (string?)null };
+        using var options = new PDFExportOptions { Combine = true, FileName = fileName };
+        if (!doc.Export(folder, ids, options)) throw new InvalidOperationException("Revit reported that one or more sheets failed to export.");
+        return new { approved = true, outputPath = output, sheetIds = rawIds };
+    }
+
+    private static object ExportViewsDwg(Document doc, JsonElement request)
+    {
+        var rawIds = request.GetProperty("viewIds").EnumerateArray().Select(x => x.GetInt64()).ToArray();
+        if (rawIds.Length is < 1 or > 100 || rawIds.Distinct().Count() != rawIds.Length)
+            throw new ArgumentException("Provide 1 to 100 distinct view IDs.");
+        var ids = rawIds.Select(x => new ElementId(x)).ToList();
+        foreach (var id in ids) if (doc.GetElement(id) is not View view || view.IsTemplate) throw new ArgumentException($"Element {id.Value} is not an exportable view.");
+        var folder = Path.GetFullPath(request.GetProperty("folder").GetString() ?? "");
+        if (!Directory.Exists(folder)) throw new ArgumentException("The output folder must already exist.");
+        var prefix = Path.GetFileNameWithoutExtension(RequiredName(request, "filePrefix", 120));
+        if (string.IsNullOrWhiteSpace(prefix) || prefix.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) throw new ArgumentException("Invalid filePrefix.");
+        if (!Confirm(doc, $"Export {ids.Count} view(s) as DWG into '{folder}' using prefix '{prefix}'? Export files are external and cannot be undone through Revit."))
+            return new { approved = false, folder = (string?)null };
+        using var options = new DWGExportOptions();
+        if (!doc.Export(folder, prefix, ids, options)) throw new InvalidOperationException("Revit reported that one or more views failed to export.");
+        return new { approved = true, folder, filePrefix = prefix, viewIds = rawIds };
+    }
+
     private static XYZ Point(JsonElement point)
     {
         if (point.GetArrayLength() != 2) throw new ArgumentException("A point must contain [xMm, yMm].");
@@ -420,6 +1049,14 @@ internal sealed class BridgeHandler : IExternalEventHandler
         if (!double.IsFinite(x) || !double.IsFinite(y) || Math.Abs(x) > 1_000_000 || Math.Abs(y) > 1_000_000)
             throw new ArgumentException("Coordinates must be finite and within ±1,000,000 mm.");
         return new XYZ(FromMm(x), FromMm(y), 0);
+    }
+
+    private static XYZ Point3(JsonElement point)
+    {
+        if (point.GetArrayLength() != 3) throw new ArgumentException("A point must contain [xMm, yMm, zMm].");
+        var values = point.EnumerateArray().Select(x => x.GetDouble()).ToArray();
+        if (values.Any(x => !double.IsFinite(x) || Math.Abs(x) > 1_000_000)) throw new ArgumentException("Coordinates must be finite and within ±1,000,000 mm.");
+        return new XYZ(FromMm(values[0]), FromMm(values[1]), FromMm(values[2]));
     }
 
     private static double FromMm(double mm) => UnitUtils.ConvertToInternalUnits(mm, UnitTypeId.Millimeters);

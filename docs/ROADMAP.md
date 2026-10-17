@@ -2,9 +2,9 @@
 
 ## Multi-application sequence
 
-1. **Revit:** expand typed BIM creation/editing (doors, windows, floors, roofs, rooms, dimensions, families, materials, views and schedules) with preview and read-back validation.
-2. **AutoCAD:** complete a live 2026 host smoke test, then add polylines, blocks, dimensions, layouts, annotations and layer standards.
-3. **SketchUp:** test the packaged RBZ in a real SketchUp session, then add components, materials, tags, scenes and solid checks.
+1. **Revit:** live-test the expanded architectural tools, then add dimensioning, elevations/sections, detailed linework, crop regions and family editing.
+2. **AutoCAD:** complete a live 2026 host smoke test, then add blocks, layouts, annotations and layer standards.
+3. **SketchUp:** test the expanded RBZ in a real SketchUp session, then add scenes, component libraries, solid checks and exchange.
 4. **Blender, 3ds Max, Maya:** add native adapters using their documented scripting APIs, with version-specific install/test paths.
 5. **Lumion and Enscape:** validate host synchronization and import workflows. Direct controls require a documented, supported automation surface.
 

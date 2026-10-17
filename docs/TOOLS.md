@@ -20,6 +20,22 @@ All tools operate on the **active Revit document**. Tool results use JSON. If Re
 | `revit_set_parameter` | `elementId`, `parameterName`, `value` | Approval state and new raw value |
 | `revit_delete_elements` | 1–20 distinct `elementIds` | Approval state, requested and actually deleted IDs |
 
+## Expanded Revit 2026 tools
+
+The expanded source build provides 45 tools. Fifteen core tools were included in the earlier live smoke test; the expanded operations compile, but require a fresh interactive Revit validation before users rely on them in production.
+
+| Workflow | Tools | Purpose |
+| --- | --- | --- |
+| Discover types | `revit_list_floor_types`, `revit_list_ceiling_types`, `revit_list_roof_types`, `revit_list_view_types`, `revit_list_titleblock_types`, `revit_list_materials`, `revit_list_rooms` | Discover project content before making placements |
+| Architectural geometry | `revit_create_floors`, `revit_create_ceilings`, `revit_create_roof`, `revit_create_room` | Create typed boundary-based elements and place rooms inside enclosed boundaries |
+| Families and openings | `revit_load_family_type`, `revit_place_family_instances` | Load one local family type and place compatible instances; wall-hosted doors/windows need a valid host wall |
+| Views and sheets | `revit_create_plan_view`, `revit_create_3d_view`, `revit_duplicate_view`, `revit_set_view_scale`, `revit_set_view_visibility`, `revit_place_view_on_sheet`, `revit_create_sheet` | Create views, control scale/visibility, and arrange views on sheets |
+| Annotation and schedules | `revit_tag_elements`, `revit_list_schedule_categories`, `revit_list_schedule_fields`, `revit_create_schedule` | Place compatible tag types and build category schedules using available fields |
+| Editing and recovery | `revit_move_elements`, `revit_rotate_elements`, `revit_copy_elements`, `revit_change_element_type` | Transform or retype elements by IDs from the active project |
+| QA and deliverables | `revit_model_health`, `revit_export_sheets_pdf`, `revit_export_views_dwg` | Inspect Revit warnings and export confirmed deliverables |
+
+The footprint roof tool sets one slope angle on every boundary edge. The current connector does not create dimensions, detailed lines, elevation/section views, custom family geometry, stairs, MEP systems or linked model coordination. File exports and family loading are external effects and do not use Revit's project transaction Undo behavior.
+
 ## Create a wall
 
 Find valid `levelId` and basic `wallTypeId` with the list tools. The wall's endpoints use XY coordinates in millimetres; its Z position comes from the selected level.
@@ -50,7 +66,7 @@ Inspect the element first. `parameterName` must match exactly one parameter on t
 
 ## Delete elements
 
-Deletion can remove dependent elements too. The current source previews the affected IDs in a temporary transaction, rolls it back, then presents the affected set in the approval dialog. This preview change is compiled but awaits a live test; the published v0.1.0 binary only warns that dependent elements may be removed. The result reports every ID that Revit says it deleted. Inspect the project again after deletion.
+Deletion can remove dependent elements too. The source previews affected IDs in a temporary transaction, rolls it back, then presents the affected set in the approval dialog. The core deletion behavior was live-smoke-tested; the latest expanded binary still needs a fresh host validation. The result reports every ID Revit says it deleted. Inspect the project again after deletion.
 
 ```json
 {"elementIds": [123456]}

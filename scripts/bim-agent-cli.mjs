@@ -40,7 +40,7 @@ function request(method, params) {
   });
 }
 try {
-  await request('initialize', { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'bim-agent-cli', version: '0.2.0' } });
+  await request('initialize', { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'bim-agent-cli', version: '0.3.0' } });
   server.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
   let result;
   if (toolName === 'list') result = await request('tools/list');

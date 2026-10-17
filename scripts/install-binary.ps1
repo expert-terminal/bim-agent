@@ -18,6 +18,16 @@ $target = Join-Path $env:LOCALAPPDATA "BIM-agent\$version"
 New-Item -ItemType Directory -Path $target -Force | Out-Null
 Copy-Item -LiteralPath $assembly -Destination (Join-Path $target 'BimAgent.dll') -Force
 Copy-Item -LiteralPath $server -Destination (Join-Path $target 'server.mjs') -Force
+foreach ($folderName in @('mcp', 'scripts', 'docs', 'autocad')) {
+    $payload = Join-Path $source $folderName
+    if (Test-Path -LiteralPath $payload) {
+        Copy-Item -LiteralPath $payload -Destination $target -Recurse -Force
+    }
+}
+foreach ($fileName in @('AGENTS.md', 'capabilities.json')) {
+    $payload = Join-Path $source $fileName
+    if (Test-Path -LiteralPath $payload) { Copy-Item -LiteralPath $payload -Destination $target -Force }
+}
 $addinDir = Join-Path $env:APPDATA "Autodesk\Revit\Addins\$RevitYear"
 New-Item -ItemType Directory -Path $addinDir -Force | Out-Null
 $escaped = [System.Security.SecurityElement]::Escape((Join-Path $target 'BimAgent.dll'))
@@ -37,4 +47,8 @@ $manifest = @"
 [System.IO.File]::WriteAllText((Join-Path $addinDir 'BimAgent.addin'), $manifest)
 Write-Host "Installed BIM-agent to $target"
 Write-Host "Agent MCP server: $(Join-Path $target 'server.mjs')"
-Write-Host 'Restart Revit to load the add-in. Configure your MCP client with node and the server path above.'
+Write-Host "AutoCAD MCP server: $(Join-Path $target 'mcp\autocad.mjs')"
+Write-Host "SketchUp MCP server: $(Join-Path $target 'mcp\sketchup.mjs')"
+Write-Host 'Optional AutoCAD setup: run scripts\install-autocad.ps1 from the extracted release folder.'
+Write-Host 'Optional SketchUp setup: install BIM-agent-SketchUp.rbz through SketchUp Extension Manager.'
+Write-Host 'Restart Revit to load the add-in. Connect the host-specific MCP server in your agent.'

@@ -4,7 +4,7 @@ This repository connects AI coding agents to AEC and 3D software. Treat it as a 
 
 ## First five actions
 
-1. Read `README.md`, `capabilities.json`, `docs/PRO_WORKFLOWS.md`, and the tool reference for the target application.
+1. Read `README.md`, `capabilities.json`, `docs/PRO_WORKFLOWS.md`, the target tool reference, and `docs/REVIT_WORKFLOWS.md` when modeling in Revit.
 2. On Windows, run `./scripts/doctor.ps1`. Identify which host applications are installed and which connector builds are available. Ask the human to open the target application and a **disposable or backed-up** project before the first write.
 3. Connect the relevant local MCP server. Use `mcp/server.mjs` for Revit, `mcp/autocad.mjs` for AutoCAD, and `mcp/sketchup.mjs` for SketchUp. Do not assume a generic chat subscription exposes local MCP tools.
    - In Expert OS, configure its stdio MCP client as shown in `docs/EXPERT_AI.md`.
@@ -18,6 +18,7 @@ This repository connects AI coding agents to AEC and 3D software. Treat it as a 
 - AutoCAD: check `INSUNITS` before generating geometry. Coordinates in the current tools are native drawing units. Use layers deliberately; keep 2D linework and 3D solids distinct.
 - SketchUp: coordinates in the current extrusion tool are millimetres. Keep generated geometry grouped, named and tagged; verify face orientation and solids in SketchUp.
 - Across applications: keep a project coordinate strategy, named object conventions, geometry tolerances, material intent, deliverable views, and review checkpoints. Document assumptions and unresolved design decisions.
+- Revit workflows: inspect types and family availability first; use typed elements; place hosted families against verified host IDs; build views, tags, schedules and sheets from project standards; query model warnings after each major phase. Follow the task's source dimensions, and ask for missing design constraints before inventing critical dimensions.
 - Never claim a code compile proves host runtime behavior. If a target app is absent, report a packaged but untested adapter.
 
 ## Extending a host adapter

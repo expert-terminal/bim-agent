@@ -10,6 +10,9 @@ const tools = [
   { name: 'autocad_list_layers', description: 'List drawing layers and their locked/frozen state.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'autocad_list_entities', description: 'List up to 200 model-space entities with handles and layers.', inputSchema: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
   { name: 'autocad_create_lines', description: 'Create 1–100 3D-capable line entities after AutoCAD approval. Coordinates use native drawing units; call autocad_status first.', inputSchema: { type: 'object', properties: { lines: { type: 'array', minItems: 1, maxItems: 100, items: { type: 'object', properties: { start: point, end: point, layer: { type: 'string' } }, required: ['start', 'end'], additionalProperties: false } } }, required: ['lines'], additionalProperties: false } },
+  { name: 'autocad_create_polylines', description: 'Create 1–50 open or closed 2D polylines with 2–200 vertices each in native drawing units.', inputSchema: { type: 'object', properties: { polylines: { type: 'array', minItems: 1, maxItems: 50, items: { type: 'object', properties: { points: { type: 'array', minItems: 2, maxItems: 200, items: point }, closed: { type: 'boolean' }, layer: { type: 'string' } }, required: ['points'], additionalProperties: false } } }, required: ['polylines'], additionalProperties: false } },
+  { name: 'autocad_create_dimension', description: 'Create a linear dimension between two coplanar points. Offset uses drawing units; call autocad_status first.', inputSchema: { type: 'object', properties: { start: point, end: point, offset: { type: 'number' } }, required: ['start', 'end', 'offset'], additionalProperties: false } },
+  { name: 'autocad_create_text', description: 'Create a single-line text entity at a 3D point. Height uses native drawing units.', inputSchema: { type: 'object', properties: { position: point, text: { type: 'string' }, height: { type: 'number', exclusiveMinimum: 0 } }, required: ['position', 'text', 'height'], additionalProperties: false } },
   { name: 'autocad_create_layer', description: 'Create a named drawing layer after AutoCAD approval.', inputSchema: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'], additionalProperties: false } },
   { name: 'autocad_create_box', description: 'Create a 3D solid box after AutoCAD approval. Origin and dimensions use native drawing units; call autocad_status first.', inputSchema: { type: 'object', properties: { origin: point, width: { type: 'number', exclusiveMinimum: 0 }, depth: { type: 'number', exclusiveMinimum: 0 }, height: { type: 'number', exclusiveMinimum: 0 } }, required: ['origin', 'width', 'depth', 'height'], additionalProperties: false } }
 ];
@@ -56,7 +59,7 @@ export async function handle(message) {
   if (!message || message.jsonrpc !== '2.0' || typeof message.method !== 'string' || message.id === undefined) return;
   try {
     switch (message.method) {
-      case 'initialize': result(message.id, { protocolVersion: '2025-11-25', capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'bim-agent-autocad', version: '0.2.0' } }); break;
+      case 'initialize': result(message.id, { protocolVersion: '2025-11-25', capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'bim-agent-autocad', version: '0.3.0' } }); break;
       case 'ping': result(message.id, {}); break;
       case 'tools/list': result(message.id, { tools }); break;
       case 'tools/call': {

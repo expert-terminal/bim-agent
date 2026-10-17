@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0 — Developer preview
+
+- Expanded Revit, AutoCAD, and SketchUp modeling and documentation tools.
+- Added packaging for the three host connectors and guided Revit workflows.
+- See `docs/COMPATIBILITY.md` for compiled versus live-tested host coverage.
+
 ## Unreleased
 
 - Preview the IDs and categories of dependent elements before approving a deletion. Compiled against Revit 2026; live test pending.

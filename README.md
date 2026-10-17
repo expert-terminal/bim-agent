@@ -2,13 +2,13 @@
 
 **Open-source local bridge for agentic architecture modeling.** BIM-agent connects MCP-capable coding agents to desktop AEC applications through host extensions. It does not bundle an AI model, require an AI API key, or send model data to a BIM-agent cloud service. Give an agent this repository URL and ask it to follow [AGENTS.md](AGENTS.md) and [capabilities.json](capabilities.json).
 
-> **Status: developer preview.** Revit 2026 has live smoke tests. AutoCAD 2026 compiles against the installed SDK but awaits a host test. The SketchUp extension packages successfully but has not been tested in SketchUp. Use disposable or backed-up projects.
+> **Status: developer preview.** The original Revit connector passed live smoke tests. The expanded Revit toolset builds against Revit 2026 but awaits live testing. AutoCAD 2026 builds against the installed SDK; the expanded SketchUp extension is packaged but neither has been runtime-tested. Use disposable or backed-up projects.
 
 | Application | Current connector | Status |
 | --- | --- | --- |
-| Revit 2026 | Native add-in + MCP | Live smoke tested |
-| AutoCAD 2026 | Native .NET bundle + MCP | Compiled; host test pending |
-| SketchUp | Ruby extension + MCP | Packaged; host test pending |
+| Revit 2026 | Native add-in + MCP | 15-tool core live-tested; expanded 45-tool set compiled, live test pending |
+| AutoCAD 2026 | Native .NET bundle + MCP | 9 tools compiled; host test pending |
+| SketchUp | Ruby extension + MCP | 16 tools packaged; host test pending |
 | Blender, 3ds Max, Maya | Scripting APIs researched | Adapter work pending |
 | Lumion, Enscape | Host sync / visualization route | No direct agent connector claimed |
 
@@ -27,24 +27,13 @@ node scripts/bim-agent-cli.mjs revit revit_create_walls request.json
 
 Read [Expert AI setup and evidence](docs/EXPERT_AI.md) for product-specific instructions. Any agent with local shell access can use this entry point; agents with an MCP client can connect to the corresponding `mcp/*.mjs` server directly.
 
-## What an agent can do today
+## Revit modeling scope
 
-| Tool | Purpose |
-| --- | --- |
-| `revit_status` | Identify the active document, Revit version, and read-only state |
-| `revit_list_levels` | Get level IDs and elevations in millimetres |
-| `revit_list_wall_types` | Get wall type IDs and kinds |
-| `revit_list_views` / `revit_list_sheets` | Discover project views and sheets |
-| `revit_list_family_types` | Discover loadable family types by category |
-| `revit_list_walls` | Inspect a bounded list of walls |
-| `revit_list_elements` | Discover placed elements, optionally by category name |
-| `revit_inspect_element` | Read an element and its instance parameters |
-| `revit_create_walls` | Create a batch of straight basic walls in millimetres |
-| `revit_create_level` / `revit_create_grid` / `revit_create_sheet` | Create core project structure and documentation |
-| `revit_set_parameter` | Edit a writable instance parameter |
-| `revit_delete_elements` | Delete selected elements and report dependent deletions |
+The current 45-tool Revit catalog supports project/type discovery, walls, floors, ceilings, footprint roofs, rooms, family loading and placement (including hosted openings), parameter/type edits, transforms, plan and 3D views, visibility, tags, schedules, title-block sheets, PDF/DWG export, warning inspection and deletion. The agent should inspect available families and types, propose a coordinate-based plan, execute bounded batches, then inspect results and warnings. The complete sequence is in [REVIT_WORKFLOWS.md](docs/REVIT_WORKFLOWS.md); inputs and limitations are in [TOOLS.md](docs/TOOLS.md).
 
-Each write asks the Revit user to approve it. Changes execute in a Revit transaction, so a successful operation appears in Revit's Undo menu. **Undo is a consequence of Revit's required transaction system, not a limit on what an agent can eventually do.** Some project operations have special APIs or external side effects and need their own tools and safeguards; see [architecture and scope](docs/ARCHITECTURE.md) and [roadmap](docs/ROADMAP.md).
+The current catalog does not create dimensions, detailed drafting linework, elevations/sections, custom parametric families, stairs, MEP systems or linked-model coordination. It can prepare useful native BIM and sheet deliverables when the project contains suitable families, types and standards. Construction-document completeness and design compliance require professional review.
+
+Each project-changing operation asks the Revit user to approve its scope in a Revit dialog. Model edits use Revit transactions and Undo; family loading and file export use Revit's native APIs and are explicitly identified as non-Undoable external effects. Current Revit workflows create typed walls, floors, ceilings, roofs, rooms, family instances, plans, tags, schedules, sheets, and PDF/DWG outputs. See the [architectural workflow guide](docs/REVIT_WORKFLOWS.md) and [full tool reference](docs/TOOLS.md).
 
 ## How it works
 
@@ -73,7 +62,7 @@ Restart Revit and open a project. The installer writes a per-user `.addin` manif
 
 ### Binary preview package
 
-Download the `BIM-agent-0.1.0-preview.zip` asset from [Releases](https://github.com/expert-terminal/bim-agent/releases), extract it, and run `./install.ps1` from the extracted folder. The package includes the built add-in and MCP server, so it does not require the .NET SDK. It still requires Revit 2026 and Node.js 22+. The installer copies files under your local app data folder, registers a per-user Revit add-in, and prints the MCP server path. Restart Revit afterward.
+Download the latest BIM-agent-0.3.0-preview.zip asset from [Releases](https://github.com/expert-terminal/bim-agent/releases), extract it, and run install.ps1 from the extracted folder. The package includes the built add-in and MCP servers, so it does not require the .NET SDK. It still requires Revit 2026 and Node.js 22+. The installer copies files under your local app data folder, registers a per-user Revit add-in, and prints the MCP server path. Restart Revit afterward.
 
 ### Connect Codex
 
@@ -104,9 +93,9 @@ Codex supports MCP servers, but ChatGPT web custom MCP connections do not direct
 ## First test
 
 1. Create or open a disposable Revit project.
-2. Ask the agent: “Use `revit_status`, then list levels and wall types.”
-3. Ask it to inspect an element or create one short wall. Check the proposed dimensions in the Revit approval dialog.
-4. Inspect the resulting element and confirm that Revit Undo contains the change.
+2. Ask the agent to read AGENTS.md and docs/REVIT_WORKFLOWS.md.
+3. Ask it to inspect the active document, levels, types, families and warnings before proposing a building plan.
+4. Approve each summarized batch in Revit, then ask the agent to inspect created elements, views, schedules and warnings. Check PDF/DWG exports before sharing.
 
 The wall tool accepts `[x, y]` endpoints and height in **millimetres**. IDs must come from the currently open document. For `revit_set_parameter`, inspect the parameter first: string values are text, integer values are integers, and double values are strings parsed in the project's displayed units, such as `"300 mm"`.
 

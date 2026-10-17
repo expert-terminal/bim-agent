@@ -1,4 +1,14 @@
-# v0.1.0-preview
+# v0.3.0-preview
+
+- Expanded the Revit catalog to 45 tools for architecture modeling, family placement, rooms, views, tags, schedules, sheets, PDF/DWG exports, model inspection and edits.
+- Expanded AutoCAD to 9 tools, including polylines, dimensions and text.
+- Expanded SketchUp to 16 tools for component geometry, materials, tags and transforms.
+- Added guided Revit workflows, capability discovery and host-specific setup documentation.
+- Compiled Revit 2026 and AutoCAD 2026 bridges. The original 15-tool Revit core has live smoke-test evidence; expanded Revit, AutoCAD and SketchUp behavior still needs runtime validation in their host applications.
+
+This remains a developer preview. It does not create complete construction documentation or support every Revit modeling domain. See [compatibility](COMPATIBILITY.md), [Revit workflows](REVIT_WORKFLOWS.md), and [tool reference](TOOLS.md).
+
+## Previous release: v0.1.0-preview
 
 First public developer preview for Windows and Autodesk Revit 2026.
 
