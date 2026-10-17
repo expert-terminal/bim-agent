@@ -1,8 +1,18 @@
 # BIM-agent
 
-**Open-source local bridge for agentic Revit modeling.** BIM-agent exposes a live Revit model to MCP-capable coding agents through a small stdio server and a Revit add-in. It does not bundle a model, require an AI API key, or send model data to a BIM-agent cloud service.
+**Open-source local bridge for agentic architecture modeling.** BIM-agent connects MCP-capable coding agents to desktop AEC applications through host extensions. It does not bundle an AI model, require an AI API key, or send model data to a BIM-agent cloud service. Give an agent this repository URL and ask it to follow [AGENTS.md](AGENTS.md) and [capabilities.json](capabilities.json).
 
-> **Status: developer preview for Revit 2026.** The add-in compiles against Revit 2026 and has passed a live connection check. Model writes and a clean installer still need broader testing. Use a disposable Revit project.
+> **Status: developer preview.** Revit 2026 has live smoke tests. AutoCAD 2026 compiles against the installed SDK but awaits a host test. The SketchUp extension packages successfully but has not been tested in SketchUp. Use disposable or backed-up projects.
+
+| Application | Current connector | Status |
+| --- | --- | --- |
+| Revit 2026 | Native add-in + MCP | Live smoke tested |
+| AutoCAD 2026 | Native .NET bundle + MCP | Compiled; host test pending |
+| SketchUp | Ruby extension + MCP | Packaged; host test pending |
+| Blender, 3ds Max, Maya | Scripting APIs researched | Adapter work pending |
+| Lumion, Enscape | Host sync / visualization route | No direct agent connector claimed |
+
+See [compatibility and limits](docs/COMPATIBILITY.md), [AutoCAD setup](docs/AUTOCAD.md), [SketchUp setup](docs/SKETCHUP.md), and [professional workflows](docs/PRO_WORKFLOWS.md).
 
 ## What an agent can do today
 

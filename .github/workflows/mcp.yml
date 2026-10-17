@@ -12,3 +12,8 @@ jobs:
           node-version: '22'
       - run: node --test mcp/server.test.mjs
       - run: node --check mcp/server.mjs
+      - run: node --check mcp/autocad.mjs
+      - run: node --check mcp/sketchup.mjs
+      - run: node -e "JSON.parse(require('fs').readFileSync('capabilities.json', 'utf8'))"
+      - shell: pwsh
+        run: ./scripts/package-sketchup.ps1

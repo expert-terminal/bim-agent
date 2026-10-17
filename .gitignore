@@ -1,5 +1,7 @@
 addin/bin/
 addin/obj/
+autocad/bin/
+autocad/obj/
 build-check*/
 dist/
 node_modules/

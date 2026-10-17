@@ -1,5 +1,15 @@
 # Roadmap
 
+## Multi-application sequence
+
+1. **Revit:** expand typed BIM creation/editing (doors, windows, floors, roofs, rooms, dimensions, families, materials, views and schedules) with preview and read-back validation.
+2. **AutoCAD:** complete a live 2026 host smoke test, then add polylines, blocks, dimensions, layouts, annotations and layer standards.
+3. **SketchUp:** test the packaged RBZ in a real SketchUp session, then add components, materials, tags, scenes and solid checks.
+4. **Blender, 3ds Max, Maya:** add native adapters using their documented scripting APIs, with version-specific install/test paths.
+5. **Lumion and Enscape:** validate host synchronization and import workflows. Direct controls require a documented, supported automation surface.
+
+For each host, prioritize status and inventory, bounded creation/editing, native undo/transaction semantics, validation, and smoke tests before broadening scope. See [compatibility](COMPATIBILITY.md).
+
 The goal is natural-language control of a complete BIM workflow through small, typed and verifiable operations. Revit exposes different APIs and constraints for different element families, so full project coverage requires many deliberately designed workflows.
 
 ## 0.1 — Developer preview (current)

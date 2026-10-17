@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "project": "BIM-agent",
+  "unitsPolicy": "Inspect project units before modeling; tool-specific units are explicit in descriptions.",
+  "adapters": [
+    {
+      "app": "Revit",
+      "priority": 1,
+      "version": "2026",
+      "status": "live-smoke-tested",
+      "mcpEntry": "mcp/server.mjs",
+      "source": "addin/",
+      "capabilities": ["project read", "element read", "walls", "levels", "grids", "sheets", "parameter edit", "deletion"]
+    },
+    {
+      "app": "AutoCAD",
+      "priority": 2,
+      "version": "2026",
+      "status": "compiled-not-live-tested",
+      "mcpEntry": "mcp/autocad.mjs",
+      "source": "autocad/",
+      "capabilities": ["drawing read", "layer read/create", "entity read", "line creation", "3D solid box creation"]
+    },
+    {
+      "app": "SketchUp",
+      "priority": 3,
+      "version": "unverified",
+      "status": "packaged-not-live-tested",
+      "mcpEntry": "mcp/sketchup.mjs",
+      "source": "sketchup/",
+      "capabilities": ["model read", "group read/delete", "footprint extrusion"]
+    },
+    { "app": "Blender", "priority": 4, "status": "research", "capabilities": [] },
+    { "app": "3ds Max", "priority": 5, "status": "research", "capabilities": [] },
+    { "app": "Maya", "priority": 6, "status": "research", "capabilities": [] },
+    { "app": "Lumion", "priority": 7, "status": "host-sync-and-import-only", "capabilities": [] },
+    { "app": "Enscape", "priority": 8, "status": "host-plugin-integration-only", "capabilities": [] }
+  ]
+}

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>BimAgent.AutoCAD</AssemblyName>
+    <Version>0.2.0</Version>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(AutoCADInstallPath)' == ''">
+    <AutoCADInstallPath>C:\Program Files\Autodesk\AutoCAD 2026</AutoCADInstallPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="acmgd"><HintPath>$(AutoCADInstallPath)\acmgd.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="acdbmgd"><HintPath>$(AutoCADInstallPath)\acdbmgd.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="accoremgd"><HintPath>$(AutoCADInstallPath)\accoremgd.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>
