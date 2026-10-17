@@ -6,7 +6,7 @@
 
 | Application | Current connector | Status |
 | --- | --- | --- |
-| Revit 2026 | Native add-in + MCP | 15-tool core live-tested; expanded 52-tool set compiled, live test pending |
+| Revit 2026 | Native add-in + MCP | 15-tool core live-tested; expanded 56-tool set compiled, live test pending |
 | AutoCAD 2026 | Native .NET bundle + MCP | 17 tools compiled; host test pending |
 | SketchUp | Ruby extension + MCP | 27 tools packaged; host test pending |
 | Blender, 3ds Max, Maya | Scripting APIs researched | Adapter work pending |
@@ -29,7 +29,7 @@ Read [Expert AI setup and evidence](docs/EXPERT_AI.md) for product-specific inst
 
 ## Revit modeling scope
 
-The current 52-tool Revit catalog supports project/type discovery, typed walls, floors, ceilings, footprint roofs, rooms, family loading and placement (including hosted openings), parameter/type edits, transforms, groups, plan/drafting/section/elevation/3D views, detail lines, grid dimensions, visibility, tags, schedules, title-block sheets, PDF/DWG export, warning inspection and deletion. The agent should inspect available families and types, propose a coordinate-based plan, execute bounded batches, then inspect results and warnings. The complete sequence is in [REVIT_WORKFLOWS.md](docs/REVIT_WORKFLOWS.md); inputs and limitations are in [TOOLS.md](docs/TOOLS.md).
+The current 56-tool Revit catalog supports project/type discovery, typed walls, floors, ceilings, footprint roofs, rooms, family loading and placement (including hosted openings), parameter/type edits, transforms, groups, plan/drafting/section/elevation/3D views, office view templates, typed text notes, detail lines, grid dimensions, visibility, tags, schedules, title-block sheets, PDF/DWG export, warning inspection and deletion. The agent should inspect available families and types, propose a coordinate-based plan, execute bounded batches, then inspect results and warnings. The complete sequence is in [REVIT_WORKFLOWS.md](docs/REVIT_WORKFLOWS.md); inputs and limitations are in [TOOLS.md](docs/TOOLS.md).
 
 Revit dimensions currently cover parallel straight grids; arbitrary wall/face dimensions, full annotation standards, filled regions, keynote systems, custom parametric families, stairs, curtain systems, MEP systems and linked-model coordination remain unimplemented. Detail lines are simple view-specific segments. Section boxes are axis-aligned to world X/Y, and elevation direction uses Revit marker indices. The connector can prepare useful native BIM and sheet deliverables when the project contains suitable families, types and standards. Construction-document completeness and design compliance require professional review.
 
@@ -62,7 +62,7 @@ Restart Revit and open a project. The installer writes a per-user `.addin` manif
 
 ### Binary preview package
 
-Download the latest BIM-agent-0.4.0-preview.zip asset from [Releases](https://github.com/expert-terminal/bim-agent/releases), extract it, and run install.ps1 from the extracted folder. The package includes the built add-in and MCP servers, so it does not require the .NET SDK. It still requires Revit 2026 and Node.js 22+. The installer copies files under your local app data folder, registers a per-user Revit add-in, and prints the MCP server path. Restart Revit afterward.
+Download the latest BIM-agent preview ZIP asset from [Releases](https://github.com/expert-terminal/bim-agent/releases), extract it, and run install.ps1 from the extracted folder. The package includes the built add-in and MCP servers, so it does not require the .NET SDK. It still requires Revit 2026 and Node.js 22+. The installer copies files under your local app data folder, registers a per-user Revit add-in, and prints the MCP server path. Restart Revit afterward.
 
 ### Connect Codex
 

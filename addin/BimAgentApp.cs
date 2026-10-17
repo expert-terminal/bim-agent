@@ -145,6 +145,8 @@ internal sealed class BridgeHandler : IExternalEventHandler
                 .OrderBy(x => x.Name).Take(Limit(request)).Select(x => new { id = x.Id.Value, name = x.Name, color = new[] { x.Color.Red, x.Color.Green, x.Color.Blue } }).ToArray(),
             "model_health" => ModelHealth(doc, request),
             "views" => ListViews(doc, request),
+            "view_templates" => ListViewTemplates(doc, request),
+            "text_note_types" => ListTextNoteTypes(doc, request),
             "sheets" => ListSheets(doc, request),
             "family_types" => ListFamilyTypes(doc, request),
             "walls" => ListWalls(doc, request),
@@ -161,6 +163,8 @@ internal sealed class BridgeHandler : IExternalEventHandler
             "create_section_view" => CreateSectionView(doc, request),
             "create_elevation_view" => CreateElevationView(doc, request),
             "create_detail_lines" => CreateDetailLines(doc, request),
+            "create_text_notes" => CreateTextNotes(doc, request),
+            "apply_view_template" => ApplyViewTemplate(doc, request),
             "dimension_grids" => DimensionGrids(doc, request),
             "create_group" => CreateGroup(doc, request),
             "ungroup_elements" => UngroupElements(doc, request),
@@ -279,6 +283,69 @@ internal sealed class BridgeHandler : IExternalEventHandler
             .Where(v => !v.IsTemplate && v is not ViewSheet)
             .OrderBy(v => v.Name).Take(Limit(request))
             .Select(v => new { id = v.Id.Value, name = v.Name, viewType = v.ViewType.ToString(), scale = v.Scale }).ToArray();
+
+    private static object ListViewTemplates(Document doc, JsonElement request) =>
+        new FilteredElementCollector(doc).OfClass(typeof(View)).Cast<View>()
+            .Where(v => v.IsTemplate).OrderBy(v => v.Name).Take(Limit(request))
+            .Select(v => new { id = v.Id.Value, name = v.Name, viewType = v.ViewType.ToString() }).ToArray();
+
+    private static object ListTextNoteTypes(Document doc, JsonElement request) =>
+        new FilteredElementCollector(doc).OfClass(typeof(TextNoteType)).Cast<TextNoteType>()
+            .OrderBy(t => t.Name).Take(Limit(request))
+            .Select(t => new { id = t.Id.Value, name = t.Name, family = t.FamilyName }).ToArray();
+
+    private static object ApplyViewTemplate(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        var viewId = new ElementId(request.GetProperty("viewId").GetInt64());
+        var templateId = new ElementId(request.GetProperty("templateId").GetInt64());
+        if (doc.GetElement(viewId) is not View view || view.IsTemplate || view is ViewSheet)
+            throw new ArgumentException("viewId must identify a non-template project view.");
+        if (doc.GetElement(templateId) is not View template || !template.IsTemplate)
+            throw new ArgumentException("templateId must identify a view template.");
+        if (!view.IsValidViewTemplate(templateId)) throw new ArgumentException("This view cannot use the requested template.");
+        if (!Confirm(doc, $"Apply view template '{template.Name}' to '{view.Name}'? Controlled visibility, scale, and graphics may change."))
+            return new { approved = false, viewId = view.Id.Value, templateId = view.ViewTemplateId.Value };
+        using var tx = new Transaction(doc, "Agent: apply view template");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            view.ViewTemplateId = templateId;
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the view template change.");
+            return new { approved = true, viewId = view.Id.Value, templateId = view.ViewTemplateId.Value, templateName = template.Name };
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+    }
+
+    private static object CreateTextNotes(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        var viewId = new ElementId(request.GetProperty("viewId").GetInt64());
+        var typeId = new ElementId(request.GetProperty("textNoteTypeId").GetInt64());
+        if (doc.GetElement(viewId) is not View view || view.IsTemplate || view is ViewSheet || !view.CanBePrinted)
+            throw new ArgumentException("viewId must identify a printable, non-template project view.");
+        if (doc.GetElement(typeId) is not TextNoteType) throw new ArgumentException("textNoteTypeId must identify a text note type.");
+        var notes = request.GetProperty("notes").EnumerateArray().ToArray();
+        if (notes.Length is < 1 or > 50) throw new ArgumentException("Provide 1 to 50 text notes.");
+        var specs = notes.Select(n =>
+        {
+            var content = n.GetProperty("text").GetString();
+            if (string.IsNullOrWhiteSpace(content) || content.Length > 2000) throw new ArgumentException("Text note content must contain 1–2000 characters.");
+            return (Content: content, Point: Point3(n.GetProperty("pointMm")));
+        }).ToArray();
+        if (!Confirm(doc, $"Create {specs.Length} text note(s) in '{view.Name}' using type '{doc.GetElement(typeId)!.Name}'?"))
+            return new { approved = false, createdIds = Array.Empty<long>() };
+        using var tx = new Transaction(doc, "Agent: create text notes");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            var options = new TextNoteOptions(typeId);
+            var created = specs.Select(s => TextNote.Create(doc, viewId, s.Point, s.Content, options)).ToArray();
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit text notes.");
+            return new { approved = true, createdIds = created.Select(n => n.Id.Value).ToArray(), count = created.Length };
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+    }
 
     private static object ListSheets(Document doc, JsonElement request) =>
         new FilteredElementCollector(doc).OfClass(typeof(ViewSheet)).Cast<ViewSheet>()

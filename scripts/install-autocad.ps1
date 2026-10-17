@@ -8,10 +8,10 @@ New-Item -ItemType Directory -Path $contents -Force | Out-Null
 Copy-Item -LiteralPath $assembly -Destination (Join-Path $contents 'BimAgent.AutoCAD.dll') -Force
 $package = @'
 <?xml version="1.0" encoding="utf-8"?>
-<ApplicationPackage SchemaVersion="1.0" ProductType="Application" AutodeskProduct="AutoCAD" Name="BIM-agent AutoCAD" AppVersion="0.4.0" Author="BIM-agent contributors">
+<ApplicationPackage SchemaVersion="1.0" ProductType="Application" AutodeskProduct="AutoCAD" Name="BIM-agent AutoCAD" AppVersion="0.5.0" Author="BIM-agent contributors">
   <Components>
     <RuntimeRequirements OS="Win64" Platform="AutoCAD" SeriesMin="R25.1" SeriesMax="R25.1" />
-    <ComponentEntry AppName="BIM-agent AutoCAD" Version="0.4.0" ModuleName="./Contents/BimAgent.AutoCAD.dll" LoadOnAutoCADStartup="True" />
+    <ComponentEntry AppName="BIM-agent AutoCAD" Version="0.5.0" ModuleName="./Contents/BimAgent.AutoCAD.dll" LoadOnAutoCADStartup="True" />
   </Components>
 </ApplicationPackage>
 '@

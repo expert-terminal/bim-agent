@@ -13,6 +13,25 @@ Several open-source Revit MCP connectors exist. A new project should earn its pl
 | [HorizunGroup/horizun-revit-mcp](https://github.com/HorizunGroup/horizun-revit-mcp) | Apache-2.0, Windows installer, typed BIM tools, verification | Strong packaging and verification benchmark |
 | [KenLP/RevitMCPServer](https://github.com/KenLP/RevitMCPServer) | Multi-step operations in one undoable transaction | Useful benchmark for atomic operations |
 
+## Mainstream feature snapshot (17 October 2026)
+
+This is a public-documentation survey, not a controlled quality or runtime benchmark. Counts below are claims in project documentation and may change. BIM-agent currently has smaller catalogs: 55 Revit, 17 AutoCAD and 27 SketchUp tools. The survey highlights workflow depth, visual feedback, batch operations, and version coverage as priorities; BIM-agent currently targets Revit 2026 and AutoCAD 2026.
+
+| Reference project | Documented coverage | Product implication |
+| --- | --- | --- |
+| [LuDattilo/revit-mcp-server](https://github.com/LuDattilo/revit-mcp-server) | README describes 124–138 Revit tools, Revit 2023–2027 builds, project/model info, clash detection, CRUD, batch operations, PDF/DWG/IFC/CSV exports, and optional in-Revit chat. | Prioritize supported version builds, coordination QA, IFC/CSV, visual feedback, and end-to-end batch workflows. |
+| [thewisekape/autocad-mcp](https://github.com/thewisekape/autocad-mcp) | 22 tools / 130+ operations over AutoLISP IPC, COM and headless DXF, including drawing management and broad entity/layer operations. | Expand beyond live model-space primitives toward drawing lifecycle, layout/block operations and an optional headless exchange backend. |
+| [zinin/sketchup-mcp2](https://github.com/zinin/sketchup-mcp2) | Typed solids/components, booleans, edge operations, export, model search, viewport screenshots and atomic undo. Also offers an arbitrary Ruby escape hatch controlled through settings. | Add search, screenshots, export and richer solid/component workflows. Any arbitrary code route must be explicitly opt-in and identified as high risk. |
+
+### What can be built and what remains a genuine gap
+
+- Typed architectural geometry, view/sheet documentation, schedules, parameter edits, transformations, warning inspection and file exports are feasible through a local adapter, subject to the host API and loaded project content. View-template and text-note operations are now part of this connector.
+- Face-referenced dimensions, crop/annotation standards, custom family authoring, stairs, curtain-wall systems, MEP routing/connectivity, linked model coordination, clash review, worksharing-aware changes and visual feedback require substantial design and live validation.
+- Unattended Revit jobs use Autodesk's separate Automation API with restrictions; they do not provide the same interactive UI access as a local add-in. A coding-agent subscription does not guarantee local MCP access in every product surface.
+- Valid Revit API objects can still be architecturally, dimensionally, code, accessibility, fire/life-safety, structural or documentation-wrong. Specification checks, visual review and licensed professional judgment remain necessary.
+
+The next milestone should prove a complete brief-to-verified-model-and-sheets workflow with visual feedback, repeatable QA, family lookup and supported-version builds, rather than optimize only for tool count.
+
 ## Platform facts
 
 - A Revit add-in loads through a `.addin` manifest. [Autodesk registration guide](https://help.autodesk.com/cloudhelp/2026/ENU/Revit-API/files/Revit_API_Developers_Guide/Introduction/Add_In_Integration/Revit_API_Revit_API_Developers_Guide_Introduction_Add_In_Integration_Add_in_Registration_html.html)

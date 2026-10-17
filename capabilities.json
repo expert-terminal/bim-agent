@@ -13,10 +13,10 @@
       "app": "Revit",
       "priority": 1,
       "version": "2026",
-      "status": "core-live-smoke-tested-expanded-52-tools-compiled-host-test-pending",
+      "status": "core-live-smoke-tested-expanded-56-tools-compiled-host-test-pending",
       "mcpEntry": "mcp/server.mjs",
       "source": "addin/",
-      "capabilities": ["project metadata and element inspection", "family loading and instance placement", "walls", "floors", "ceilings", "footprint roofs", "rooms", "levels", "grids", "plan, drafting, section, elevation and isometric views", "view scale and visibility", "view-specific detail lines", "parallel-grid dimensions", "model group and ungroup", "tags", "schedules", "sheets and viewport placement", "family and instance parameter edits", "move, rotate, copy, type change and deletion", "model warning inspection", "PDF and DWG exports"]
+      "capabilities": ["project metadata and element inspection", "family loading and instance placement", "walls", "floors", "ceilings", "footprint roofs", "rooms", "levels", "grids", "plan, drafting, section, elevation and isometric views", "view template discovery and application", "view-specific text notes and detail lines", "view scale and visibility", "parallel-grid dimensions", "model group and ungroup", "tags", "schedules", "sheets and viewport placement", "family and instance parameter edits", "move, rotate, copy, type change and deletion", "model warning inspection", "PDF and DWG exports"]
     },
     {
       "app": "AutoCAD",

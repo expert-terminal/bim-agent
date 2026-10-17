@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0 — Developer preview
+
+- Revit: added view-template discovery/application and typed text-note creation.
+- Added a documented competitor feature survey and buildable/gap analysis.
+- Expanded Revit operations still need a fresh interactive host validation.
+
 ## 0.4.0 — Developer preview
 
 - Revit: added drafting, section and elevation views, detail lines, straight-grid dimensions, and group/ungroup operations.

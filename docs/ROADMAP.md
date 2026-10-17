@@ -2,7 +2,7 @@
 
 ## Multi-application sequence
 
-1. **Revit:** live-test the 52-tool catalog, then add arbitrary wall/face dimensions, crop controls, filled regions, text notes, type-level material editing, stairs and MEP operations.
+1. **Revit:** live-test the 56-tool catalog, then add arbitrary wall/face dimensions, crop controls, filled regions, type-level material editing, stairs and MEP operations.
 2. **AutoCAD:** complete a live 2026 host smoke test, then add blocks/inserts, layouts/viewports, block attributes, layer standards and file exchange.
 3. **SketchUp:** test the 27-tool RBZ in a real SketchUp session, then add solid validation, terrain, stronger nested component workflows, textures and LayOut automation.
 4. **Blender, 3ds Max, Maya:** add native adapters using their documented scripting APIs, with version-specific install/test paths.
@@ -12,9 +12,9 @@ For each host, prioritize status and inventory, bounded creation/editing, native
 
 The goal is natural-language control of a complete BIM workflow through small, typed and verifiable operations. Revit exposes different APIs and constraints for different element families, so full project coverage requires many deliberately designed workflows.
 
-## Current preview — 0.4.0
+## Current preview — 0.5.0
 
-Current release adds typed architectural geometry and family placement; plan, drafting, section, elevation and 3D views; detail lines and parallel-grid dimensions; groups; schedules, tags, sheets and exports. Revit 2026 and AutoCAD 2026 compile; the SketchUp extension packages. The original 15-tool Revit core has live smoke-test evidence, while expanded operations await fresh host validation.
+Current preview adds template discovery/application and typed text-note placement to the previous typed architectural geometry and family placement; plan, drafting, section, elevation and 3D views; detail lines and parallel-grid dimensions; groups; schedules, tags, sheets and exports. Revit 2026 and AutoCAD 2026 compile; the SketchUp extension packages. The original 15-tool Revit core has live smoke-test evidence, while expanded operations await fresh host validation.
 
 ## 0.2 — Trustworthy modeling workflow
 

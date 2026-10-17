@@ -72,7 +72,7 @@ export async function handle(message) {
   if (!message || message.jsonrpc !== '2.0' || typeof message.method !== 'string' || message.id === undefined) return;
   try {
     switch (message.method) {
-      case 'initialize': result(message.id, { protocolVersion: '2025-11-25', capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'bim-agent-sketchup', version: '0.4.0' } }); break;
+      case 'initialize': result(message.id, { protocolVersion: '2025-11-25', capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'bim-agent-sketchup', version: '0.5.0' } }); break;
       case 'ping': result(message.id, {}); break;
       case 'tools/list': result(message.id, { tools }); break;
       case 'tools/call': {

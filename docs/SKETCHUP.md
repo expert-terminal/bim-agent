@@ -2,7 +2,7 @@
 
 ## Install and connect
 
-Run `./scripts/package-sketchup.ps1` on Windows, then install the generated `dist/BIM-agent-SketchUp-0.4.0-preview.rbz` through SketchUp's Extension Manager. Restart SketchUp and open a disposable model. Configure an MCP client to run `node C:\absolute\path\to\bim-agent\mcp\sketchup.mjs`. The extension creates a random token and a loopback listener on startup. The MCP server reads its local configuration from `%LOCALAPPDATA%\BIM-agent\sketchup-bridge.json`.
+Run `./scripts/package-sketchup.ps1` on Windows, then install the generated `dist/BIM-agent-SketchUp-0.5.0-preview.rbz` through SketchUp's Extension Manager. Restart SketchUp and open a disposable model. Configure an MCP client to run `node C:\absolute\path\to\bim-agent\mcp\sketchup.mjs`. The extension creates a random token and a loopback listener on startup. The MCP server reads its local configuration from `%LOCALAPPDATA%\BIM-agent\sketchup-bridge.json`.
 
 | Tool | Current scope |
 | --- | --- |

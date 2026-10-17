@@ -4,7 +4,7 @@ BIM-agent uses one MCP entry point per host today. A coding agent must install t
 
 | Host | Route | Evidence and current limit |
 | --- | --- | --- |
-| Revit 2026 | In-process .NET add-in; ExternalEvent and transactions | Earlier 15-tool core passed live smoke tests. Expanded 52-tool source compiles; added documentation/view operations await live host tests. |
+| Revit 2026 | In-process .NET add-in; ExternalEvent and transactions | Earlier 15-tool core passed live smoke tests. Expanded 56-tool source compiles; new documentation/view operations await live host tests. |
 | AutoCAD 2026 | In-process .NET extension; idle dispatch and transactions | Expanded 17-tool source compiles against installed 2026 DLLs; no host runtime test yet |
 | SketchUp | Ruby extension; UI timer and model operations | Expanded 27-tool RBZ package built; SketchUp unavailable on development machine, so runtime unverified |
 | Blender | Python API and main-thread timers | Feasible adapter path; no shipped connector |

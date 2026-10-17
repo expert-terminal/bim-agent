@@ -22,20 +22,20 @@ All tools operate on the **active Revit document**. Tool results use JSON. If Re
 
 ## Expanded Revit 2026 tools
 
-The expanded source build provides 52 tools. Fifteen core tools were included in the earlier live smoke test; the expanded operations compile, but require a fresh interactive Revit validation before users rely on them in production.
+The expanded source build provides 56 tools. Fifteen core tools were included in the earlier live smoke test; the expanded operations compile, but require a fresh interactive Revit validation before users rely on them in production.
 
 | Workflow | Tools | Purpose |
 | --- | --- | --- |
 | Discover types | `revit_list_floor_types`, `revit_list_ceiling_types`, `revit_list_roof_types`, `revit_list_view_types`, `revit_list_titleblock_types`, `revit_list_materials`, `revit_list_rooms` | Discover project content before making placements |
 | Architectural geometry | `revit_create_floors`, `revit_create_ceilings`, `revit_create_roof`, `revit_create_room` | Create typed boundary-based elements and place rooms inside enclosed boundaries |
 | Families and openings | `revit_load_family_type`, `revit_place_family_instances` | Load one local family type and place compatible instances; wall-hosted doors/windows need a valid host wall |
-| Views and sheets | `revit_create_plan_view`, `revit_create_3d_view`, `revit_duplicate_view`, `revit_set_view_scale`, `revit_set_view_visibility`, `revit_place_view_on_sheet`, `revit_create_sheet` | Create views, control scale/visibility, and arrange views on sheets |
-| Documentation views and graphics | `revit_create_drafting_view`, `revit_create_section_view`, `revit_create_elevation_view`, `revit_create_detail_lines`, `revit_dimension_grids` | Create a drafting view, bounded axis-aligned section, marker-based elevation, view-specific linework, and dimensions between parallel straight grids |
+| Views and sheets | `revit_create_plan_view`, `revit_create_3d_view`, `revit_duplicate_view`, `revit_set_view_scale`, `revit_set_view_visibility`, `revit_list_view_templates`, `revit_apply_view_template`, `revit_place_view_on_sheet`, `revit_create_sheet` | Create views, apply a compatible office template, control scale/visibility, and arrange views on sheets |
+| Documentation views and graphics | `revit_list_text_note_types`, `revit_create_drafting_view`, `revit_create_section_view`, `revit_create_elevation_view`, `revit_create_detail_lines`, `revit_create_text_notes`, `revit_dimension_grids` | Discover loaded note styles; create a drafting view, bounded axis-aligned section, marker-based elevation, view-specific lines and typed notes, and dimensions between parallel straight grids |
 | Annotation and schedules | `revit_tag_elements`, `revit_list_schedule_categories`, `revit_list_schedule_fields`, `revit_create_schedule` | Place compatible tag types and build category schedules using available fields |
 | Editing and recovery | `revit_move_elements`, `revit_rotate_elements`, `revit_copy_elements`, `revit_change_element_type`, `revit_create_group`, `revit_ungroup_elements` | Transform, retype, group, or ungroup elements from the active project |
 | QA and deliverables | `revit_model_health`, `revit_export_sheets_pdf`, `revit_export_views_dwg` | Inspect Revit warnings and export confirmed deliverables |
 
-The footprint roof tool sets one slope angle on every boundary edge. Grid dimensions cover straight parallel grids only; arbitrary wall/face dimensioning is not implemented. Section boxes are aligned to world X or Y; elevation direction uses the four Revit marker indices. Detail lines are plain segments without line styles or filled regions. Custom families, stairs, MEP systems and linked-model coordination remain gaps. File exports and family loading are external effects and do not use Revit's project transaction Undo behavior.
+The footprint roof tool sets one slope angle on every boundary edge. Grid dimensions cover straight parallel grids only; arbitrary wall/face dimensioning is not implemented. Section boxes are aligned to world X or Y; elevation direction uses the four Revit marker indices. Detail lines are plain segments without line styles or filled regions. Text note coordinates are view/model coordinates and can need adjustment in the target view. Applying a template can override view settings controlled by that template. Custom family authoring, stairs, curtain systems, MEP systems and linked-model coordination remain gaps. File exports and family loading are external effects and do not use Revit's project transaction Undo behavior.
 
 ## Create a wall
 

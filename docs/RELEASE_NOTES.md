@@ -1,3 +1,8 @@
+# v0.5.0-preview
+
+- Revit grows from 52 to 56 tools: view-template and text-note type discovery, template application, and typed text notes. New operations compile but still need interactive Revit validation.
+- Feasibility study updated with current public Revit, AutoCAD and SketchUp feature snapshots and roadmap priorities.
+
 # v0.4.0-preview
 
 - Revit grew from 45 to 52 tools: drafting, section and elevation views, detail lines, grid dimensions, and group/ungroup operations.
