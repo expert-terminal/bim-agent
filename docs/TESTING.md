@@ -22,6 +22,7 @@ The automated MCP test checks initialization, tool discovery and method errors. 
 
 - `revit_status` returned the active project, version and read-only state.
 - Consecutive calls listed levels and wall types.
+- The new view, sheet and family-type tools compile, but the running Revit process still had the earlier DLL loaded during the final live check; their live results remain pending.
 - Created a 1,000 mm basic wall on L1 after Revit approval; read-back showed the selected type, level, 1,000 mm length and 3,000 mm height.
 - Edited its `Comments` parameter after approval.
 - Deleted that test wall after approval; Revit reported the created ID among deleted IDs.

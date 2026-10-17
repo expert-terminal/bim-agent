@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>BimAgent</AssemblyName>
+    <Version>0.1.0</Version>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="RevitAPI"><HintPath>$(RevitInstallPath)\RevitAPI.dll</HintPath><Private>false</Private></Reference>

@@ -48,6 +48,10 @@ dotnet build addin/BimAgent.csproj -c Release
 
 Restart Revit and open a project. The installer writes a per-user `.addin` manifest pointing to the built DLL. Keep the cloned folder at the same path. **Close Revit before rebuilding:** Revit locks the loaded DLL. Run `./scripts/uninstall.ps1` to remove that manifest.
 
+### Binary preview package
+
+Download the `BIM-agent-0.1.0-preview.zip` asset from [Releases](https://github.com/expert-terminal/bim-agent/releases), extract it, and run `./install.ps1` from the extracted folder. The package includes the built add-in and MCP server, so it does not require the .NET SDK. It still requires Revit 2026 and Node.js 22+. The installer copies files under your local app data folder, registers a per-user Revit add-in, and prints the MCP server path. Restart Revit afterward.
+
 ### Connect Codex
 
 ```powershell
