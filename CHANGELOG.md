@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0 — Developer preview
+
+- Revit: added drafting, section and elevation views, detail lines, straight-grid dimensions, and group/ungroup operations.
+- AutoCAD: added multiline text, circles, arcs, associative hatches, transforms and entity deletion.
+- SketchUp: added planar surfaces, dimensions, scenes, section planes, camera control, edges, circles, arcs and cylinders.
+- Updated tool discovery, capabilities and host workflow documentation.
+
 ## 0.3.0 — Developer preview
 
 - Expanded Revit, AutoCAD, and SketchUp modeling and documentation tools.

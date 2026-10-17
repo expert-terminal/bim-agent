@@ -2,9 +2,9 @@
 
 ## Multi-application sequence
 
-1. **Revit:** live-test the expanded architectural tools, then add dimensioning, elevations/sections, detailed linework, crop regions and family editing.
-2. **AutoCAD:** complete a live 2026 host smoke test, then add blocks, layouts, annotations and layer standards.
-3. **SketchUp:** test the expanded RBZ in a real SketchUp session, then add scenes, component libraries, solid checks and exchange.
+1. **Revit:** live-test the 52-tool catalog, then add arbitrary wall/face dimensions, crop controls, filled regions, text notes, type-level material editing, stairs and MEP operations.
+2. **AutoCAD:** complete a live 2026 host smoke test, then add blocks/inserts, layouts/viewports, block attributes, layer standards and file exchange.
+3. **SketchUp:** test the 27-tool RBZ in a real SketchUp session, then add solid validation, terrain, stronger nested component workflows, textures and LayOut automation.
 4. **Blender, 3ds Max, Maya:** add native adapters using their documented scripting APIs, with version-specific install/test paths.
 5. **Lumion and Enscape:** validate host synchronization and import workflows. Direct controls require a documented, supported automation surface.
 
@@ -12,9 +12,9 @@ For each host, prioritize status and inventory, bounded creation/editing, native
 
 The goal is natural-language control of a complete BIM workflow through small, typed and verifiable operations. Revit exposes different APIs and constraints for different element families, so full project coverage requires many deliberately designed workflows.
 
-## 0.1 — Developer preview (current)
+## Current preview — 0.4.0
 
-Local MCP and Revit transport, bounded reads, straight wall, level, grid and sheet creation, parameter editing, deletion, Revit approval, transactions and explicit units. Source build for Revit 2026. These tools passed live smoke tests on a disposable Revit project. Dependent-deletion preview is compiled but awaits a live test.
+Current release adds typed architectural geometry and family placement; plan, drafting, section, elevation and 3D views; detail lines and parallel-grid dimensions; groups; schedules, tags, sheets and exports. Revit 2026 and AutoCAD 2026 compile; the SketchUp extension packages. The original 15-tool Revit core has live smoke-test evidence, while expanded operations await fresh host validation.
 
 ## 0.2 — Trustworthy modeling workflow
 
@@ -24,9 +24,9 @@ Local MCP and Revit transport, bounded reads, straight wall, level, grid and she
 - Multi-operation transaction groups and an audit trail.
 - Clean install/uninstall, packaged Node runtime, and disposable-model integration tests.
 
-## 0.3 — Architectural and documentation coverage
+## Next Revit coverage
 
-Dedicated tools for floors, openings, doors, windows, rooms, roofs, dimensions, tags, schedules and family placement. Each tool will validate required types, hosts, levels, phases and units. Add natural-language workflow examples and reproducible benchmark models.
+Prioritize arbitrary face and wall dimensions, detail annotation, crop regions and material workflows, with typed validation for families, hosts, levels, phases and units. Add natural-language workflow examples and reproducible benchmark models.
 
 ## Later — Structural, MEP and coordination
 

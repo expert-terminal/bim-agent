@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>BimAgent.AutoCAD</AssemblyName>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
   </PropertyGroup>
   <PropertyGroup Condition="'$(AutoCADInstallPath)' == ''">
     <AutoCADInstallPath>C:\Program Files\Autodesk\AutoCAD 2026</AutoCADInstallPath>

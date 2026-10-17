@@ -1,4 +1,4 @@
-param([string]$Version = '0.3.0-preview')
+param([string]$Version = '0.4.0-preview')
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $stage = Join-Path $root 'dist\sketchup-rbz'

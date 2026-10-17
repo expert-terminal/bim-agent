@@ -18,7 +18,7 @@ This repository connects AI coding agents to AEC and 3D software. Treat it as a 
 - AutoCAD: check `INSUNITS` before generating geometry. Coordinates in the current tools are native drawing units. Use layers deliberately; keep 2D linework and 3D solids distinct.
 - SketchUp: coordinates in the current extrusion tool are millimetres. Keep generated geometry grouped, named and tagged; verify face orientation and solids in SketchUp.
 - Across applications: keep a project coordinate strategy, named object conventions, geometry tolerances, material intent, deliverable views, and review checkpoints. Document assumptions and unresolved design decisions.
-- Revit workflows: inspect types and family availability first; use typed elements; place hosted families against verified host IDs; build views, tags, schedules and sheets from project standards; query model warnings after each major phase. Follow the task's source dimensions, and ask for missing design constraints before inventing critical dimensions.
+- Revit workflows: inspect types and family availability first; use typed elements; place hosted families against verified host IDs; build plan, section, elevation and drafting views, tags, schedules and sheets from project standards; grid dimensions apply only to parallel straight grids; query model warnings after each major phase. Follow the task's source dimensions, and ask for missing design constraints before inventing critical dimensions.
 - Never claim a code compile proves host runtime behavior. If a target app is absent, report a packaged but untested adapter.
 
 ## Extending a host adapter

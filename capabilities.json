@@ -13,10 +13,10 @@
       "app": "Revit",
       "priority": 1,
       "version": "2026",
-      "status": "core-live-smoke-tested-expanded-45-tools-compiled-host-test-pending",
+      "status": "core-live-smoke-tested-expanded-52-tools-compiled-host-test-pending",
       "mcpEntry": "mcp/server.mjs",
       "source": "addin/",
-      "capabilities": ["project metadata and element inspection", "family loading and instance placement", "walls", "floors", "ceilings", "footprint roofs", "rooms", "levels", "grids", "plan and isometric views", "view scale and visibility", "tags", "schedules", "sheets and viewport placement", "family and instance parameter edits", "move, rotate, copy, type change and deletion", "model warning inspection", "PDF and DWG exports"]
+      "capabilities": ["project metadata and element inspection", "family loading and instance placement", "walls", "floors", "ceilings", "footprint roofs", "rooms", "levels", "grids", "plan, drafting, section, elevation and isometric views", "view scale and visibility", "view-specific detail lines", "parallel-grid dimensions", "model group and ungroup", "tags", "schedules", "sheets and viewport placement", "family and instance parameter edits", "move, rotate, copy, type change and deletion", "model warning inspection", "PDF and DWG exports"]
     },
     {
       "app": "AutoCAD",
@@ -25,7 +25,7 @@
       "status": "compiled-not-live-tested",
       "mcpEntry": "mcp/autocad.mjs",
       "source": "autocad/",
-      "capabilities": ["drawing read", "layer read/create", "entity read", "line and polyline creation", "linear dimensions", "single-line text", "3D solid box creation"]
+      "capabilities": ["drawing read", "layer read/create", "entity read", "lines, polylines, circles and arcs", "linear dimensions", "single-line and multiline text", "associative hatch", "move, copy, rotate and delete by handles", "3D solid box creation"]
     },
     {
       "app": "SketchUp",
@@ -34,7 +34,7 @@
       "status": "packaged-not-live-tested",
       "mcpEntry": "mcp/sketchup.mjs",
       "source": "sketchup/",
-      "capabilities": ["model and group read/delete", "footprint extrusion", "component creation", "box creation", "materials", "tags", "group move/rotate/copy"]
+      "capabilities": ["model and group read/delete", "footprint extrusion", "planar surfaces and edge paths", "components, boxes, cylinders, circles and arcs", "linear dimensions", "camera and scenes", "section planes", "materials", "tags", "group move/rotate/copy"]
     },
     { "app": "Blender", "priority": 4, "status": "research", "capabilities": [] },
     { "app": "3ds Max", "priority": 5, "status": "research", "capabilities": [] },

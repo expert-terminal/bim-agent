@@ -157,6 +157,13 @@ internal sealed class BridgeHandler : IExternalEventHandler
             "create_roof" => CreateRoof(doc, request),
             "place_family_instances" => PlaceFamilyInstances(doc, request),
             "create_plan_view" => CreatePlanView(doc, request),
+            "create_drafting_view" => CreateDraftingView(doc, request),
+            "create_section_view" => CreateSectionView(doc, request),
+            "create_elevation_view" => CreateElevationView(doc, request),
+            "create_detail_lines" => CreateDetailLines(doc, request),
+            "dimension_grids" => DimensionGrids(doc, request),
+            "create_group" => CreateGroup(doc, request),
+            "ungroup_elements" => UngroupElements(doc, request),
             "place_view_on_sheet" => PlaceViewOnSheet(doc, request),
             "create_3d_view" => Create3DView(doc, request),
             "set_view_scale" => SetViewScale(doc, request),
@@ -753,6 +760,211 @@ internal sealed class BridgeHandler : IExternalEventHandler
         catch { if (tx.HasStarted()) tx.RollBack(); throw; }
     }
 
+    private static object CreateDraftingView(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        var typeId = new ElementId(request.GetProperty("viewFamilyTypeId").GetInt64());
+        var name = RequiredName(request, "name", 100);
+        if (doc.GetElement(typeId) is not ViewFamilyType type || type.ViewFamily != ViewFamily.Drafting)
+            throw new ArgumentException("viewFamilyTypeId must identify a drafting view family type.");
+        if (!Confirm(doc, $"Create drafting view '{name}' using type '{type.Name}'?")) return new { approved = false, createdId = (long?)null };
+        using var tx = new Transaction(doc, "Agent: create drafting view");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            var view = ViewDrafting.Create(doc, typeId);
+            view.Name = name;
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the drafting view.");
+            return new { approved = true, createdId = (long?)view.Id.Value, name = view.Name };
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+    }
+
+    private static object CreateSectionView(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        var typeId = new ElementId(request.GetProperty("viewFamilyTypeId").GetInt64());
+        if (doc.GetElement(typeId) is not ViewFamilyType type || type.ViewFamily != ViewFamily.Section)
+            throw new ArgumentException("viewFamilyTypeId must identify a section view family type.");
+        var name = RequiredName(request, "name", 100);
+        var axis = request.GetProperty("axis").GetString()?.ToLowerInvariant();
+        if (axis is not ("x" or "y")) throw new ArgumentException("axis must be 'x' or 'y'.");
+        var origin = PointMm(request.GetProperty("originMm"));
+        var width = BoundedPositive(request.GetProperty("widthMm").GetDouble(), 10, 500_000, "widthMm");
+        var height = BoundedPositive(request.GetProperty("heightMm").GetDouble(), 10, 500_000, "heightMm");
+        var depth = BoundedPositive(request.GetProperty("depthMm").GetDouble(), 10, 500_000, "depthMm");
+        var scale = request.TryGetProperty("scale", out var scaleNode) ? scaleNode.GetInt32() : 100;
+        if (scale is < 1 or > 10000) throw new ArgumentException("scale must be between 1 and 10000.");
+        var right = axis == "x" ? XYZ.BasisY : XYZ.BasisX;
+        var up = XYZ.BasisZ;
+        var direction = axis == "x" ? XYZ.BasisX : -XYZ.BasisY;
+        if (!Confirm(doc, $"Create section '{name}' along world {axis.ToUpperInvariant()} at ({request.GetProperty("originMm")[0].GetDouble()}, {request.GetProperty("originMm")[1].GetDouble()}, {request.GetProperty("originMm")[2].GetDouble()}) mm; extents {width} × {height} × {depth} mm?"))
+            return new { approved = false, createdId = (long?)null };
+        using var tx = new Transaction(doc, "Agent: create section view");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            var transform = Transform.Identity;
+            transform.Origin = origin;
+            transform.BasisX = right;
+            transform.BasisY = up;
+            transform.BasisZ = direction;
+            var box = new BoundingBoxXYZ
+            {
+                Transform = transform,
+                Enabled = true,
+                Min = new XYZ(-FromMm(width / 2), 0, -FromMm(depth / 2)),
+                Max = new XYZ(FromMm(width / 2), FromMm(height), FromMm(depth / 2))
+            };
+            for (var bound = 0; bound < 3; bound++)
+            {
+                box.set_MinEnabled(bound, true);
+                box.set_MaxEnabled(bound, true);
+            }
+            var view = ViewSection.CreateSection(doc, typeId, box);
+            view.Name = name;
+            view.Scale = scale;
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the section view.");
+            return new { approved = true, createdId = (long?)view.Id.Value, name = view.Name, scale = view.Scale };
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+    }
+
+    private static object CreateElevationView(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        var typeId = new ElementId(request.GetProperty("viewFamilyTypeId").GetInt64());
+        var planId = new ElementId(request.GetProperty("planViewId").GetInt64());
+        if (doc.GetElement(typeId) is not ViewFamilyType type || type.ViewFamily != ViewFamily.Elevation)
+            throw new ArgumentException("viewFamilyTypeId must identify an elevation view family type.");
+        if (doc.GetElement(planId) is not ViewPlan plan || plan.IsTemplate)
+            throw new ArgumentException("planViewId must identify a non-template plan view.");
+        var index = request.GetProperty("directionIndex").GetInt32();
+        if (index is < 0 or > 3) throw new ArgumentException("directionIndex must be 0, 1, 2, or 3.");
+        var name = RequiredName(request, "name", 100);
+        var origin = PointMm(request.GetProperty("originMm"));
+        var scale = request.TryGetProperty("scale", out var scaleNode) ? scaleNode.GetInt32() : 100;
+        if (scale is < 1 or > 10000) throw new ArgumentException("scale must be between 1 and 10000.");
+        if (!Confirm(doc, $"Create elevation '{name}' from plan '{plan.Name}' at direction index {index}?"))
+            return new { approved = false, createdId = (long?)null };
+        using var tx = new Transaction(doc, "Agent: create elevation view");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            var marker = ElevationMarker.CreateElevationMarker(doc, typeId, origin, scale);
+            var view = marker.CreateElevation(doc, planId, index);
+            view.Name = name;
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the elevation view.");
+            return new { approved = true, createdId = (long?)view.Id.Value, name = view.Name, scale = view.Scale, directionIndex = index };
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+    }
+
+    private static object CreateDetailLines(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        var viewId = new ElementId(request.GetProperty("viewId").GetInt64());
+        if (doc.GetElement(viewId) is not View view || view.IsTemplate || view.ViewType == ViewType.ThreeD || view.ViewType == ViewType.Schedule)
+            throw new ArgumentException("viewId must identify a non-template 2D view.");
+        var lines = request.GetProperty("lines").EnumerateArray().ToArray();
+        if (lines.Length is < 1 or > 100) throw new ArgumentException("Provide 1 to 100 detail lines.");
+        var curves = lines.Select(item =>
+        {
+            var start = PointMm(item.GetProperty("startMm"));
+            var end = PointMm(item.GetProperty("endMm"));
+            if (start.DistanceTo(end) < 1e-6) throw new ArgumentException("Detail line endpoints must differ.");
+            return Line.CreateBound(start, end);
+        }).ToArray();
+        if (!Confirm(doc, $"Create {curves.Length} detail line(s) in view '{view.Name}'? Coordinates are absolute model millimetres."))
+            return new { approved = false, createdIds = Array.Empty<long>() };
+        using var tx = new Transaction(doc, "Agent: create detail lines");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            var created = curves.Select(curve => doc.Create.NewDetailCurve(view, curve).Id.Value).ToArray();
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit detail lines.");
+            return new { approved = true, viewId = view.Id.Value, createdIds = created };
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+    }
+
+    private static object DimensionGrids(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        var viewId = new ElementId(request.GetProperty("viewId").GetInt64());
+        if (doc.GetElement(viewId) is not ViewPlan view || view.IsTemplate) throw new ArgumentException("viewId must identify a non-template plan view.");
+        var rawIds = request.GetProperty("gridIds").EnumerateArray().Select(x => x.GetInt64()).ToArray();
+        if (rawIds.Length is < 2 or > 30 || rawIds.Distinct().Count() != rawIds.Length) throw new ArgumentException("Provide 2 to 30 distinct grid IDs.");
+        var grids = rawIds.Select(x => doc.GetElement(new ElementId(x)) as Grid ?? throw new ArgumentException($"Element {x} is not a grid.")).ToArray();
+        var lines = grids.Select(g => g.Curve as Line ?? throw new ArgumentException("Only straight grids can be dimensioned by this tool.")).ToArray();
+        var direction = lines[0].Direction.Normalize();
+        if (lines.Skip(1).Any(line => Math.Abs(direction.DotProduct(line.Direction.Normalize())) < 0.9999))
+            throw new ArgumentException("All selected grids must be parallel.");
+        var offset = request.GetProperty("offsetMm").GetDouble();
+        if (!double.IsFinite(offset) || Math.Abs(offset) > 100_000) throw new ArgumentException("offsetMm must be finite and within ±100000 mm.");
+        var normal = new XYZ(-direction.Y, direction.X, 0).Normalize();
+        var anchor = lines[0].Evaluate(0.5, true);
+        var scalars = lines.Select(line => line.Evaluate(0.5, true).DotProduct(normal)).ToArray();
+        if (scalars.Max() - scalars.Min() < FromMm(1)) throw new ArgumentException("The selected grids are too close together to dimension.");
+        var z = view.GenLevel?.Elevation ?? anchor.Z;
+        var shifted = anchor + direction * FromMm(offset);
+        var start = new XYZ(shifted.X + normal.X * (scalars.Min() - shifted.DotProduct(normal)), shifted.Y + normal.Y * (scalars.Min() - shifted.DotProduct(normal)), z);
+        var end = new XYZ(shifted.X + normal.X * (scalars.Max() - shifted.DotProduct(normal)), shifted.Y + normal.Y * (scalars.Max() - shifted.DotProduct(normal)), z);
+        if (!Confirm(doc, $"Dimension {grids.Length} parallel grids in view '{view.Name}' with a {offset} mm offset?"))
+            return new { approved = false, dimensionId = (long?)null };
+        using var tx = new Transaction(doc, "Agent: dimension grids");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            var refs = new ReferenceArray();
+            foreach (var grid in grids.Zip(scalars).OrderBy(pair => pair.Second).Select(pair => pair.First)) refs.Append(new Reference(grid));
+            var dimension = doc.Create.NewDimension(view, Line.CreateBound(start, end), refs);
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the grid dimension.");
+            return new { approved = true, dimensionId = (long?)dimension.Id.Value, gridIds = rawIds };
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+    }
+
+    private static object CreateGroup(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        var rawIds = request.GetProperty("elementIds").EnumerateArray().Select(x => x.GetInt64()).ToArray();
+        if (rawIds.Length is < 2 or > 100 || rawIds.Distinct().Count() != rawIds.Length) throw new ArgumentException("Provide 2 to 100 distinct element IDs.");
+        foreach (var id in rawIds) if (doc.GetElement(new ElementId(id)) is null) throw new ArgumentException($"Element {id} not found.");
+        var name = request.TryGetProperty("name", out var nameNode) && nameNode.ValueKind == JsonValueKind.String ? nameNode.GetString() : null;
+        if (name is { Length: > 100 }) throw new ArgumentException("Group name must be 100 characters or fewer.");
+        if (!Confirm(doc, $"Create a group from {rawIds.Length} elements{(string.IsNullOrWhiteSpace(name) ? "" : $" named '{name}'")}?"))
+            return new { approved = false, groupId = (long?)null };
+        using var tx = new Transaction(doc, "Agent: create model group");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            var group = doc.Create.NewGroup(rawIds.Select(x => new ElementId(x)).ToList());
+            if (!string.IsNullOrWhiteSpace(name)) group.GroupType.Name = name;
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the group.");
+            return new { approved = true, groupId = (long?)group.Id.Value, typeId = group.GroupType.Id.Value, name = group.GroupType.Name };
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+    }
+
+    private static object UngroupElements(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        var groupId = new ElementId(request.GetProperty("groupId").GetInt64());
+        if (doc.GetElement(groupId) is not Group group) throw new ArgumentException("groupId must identify a model group.");
+        if (!Confirm(doc, $"Ungroup '{group.GroupType.Name}'? This removes the group container and keeps its members."))
+            return new { approved = false, elementIds = Array.Empty<long>() };
+        using var tx = new Transaction(doc, "Agent: ungroup model group");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            var members = group.UngroupMembers().Select(x => x.Value).ToArray();
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the ungroup operation.");
+            return new { approved = true, elementIds = members };
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+    }
+
     private static object PlaceViewOnSheet(Document doc, JsonElement request)
     {
         var sheetId = new ElementId(request.GetProperty("sheetId").GetInt64());
@@ -1057,6 +1269,15 @@ internal sealed class BridgeHandler : IExternalEventHandler
         var values = point.EnumerateArray().Select(x => x.GetDouble()).ToArray();
         if (values.Any(x => !double.IsFinite(x) || Math.Abs(x) > 1_000_000)) throw new ArgumentException("Coordinates must be finite and within ±1,000,000 mm.");
         return new XYZ(FromMm(values[0]), FromMm(values[1]), FromMm(values[2]));
+    }
+
+    private static XYZ PointMm(JsonElement point) => Point3(point);
+
+    private static double BoundedPositive(double value, double minimum, double maximum, string name)
+    {
+        if (!double.IsFinite(value) || value < minimum || value > maximum)
+            throw new ArgumentException($"{name} must be finite and between {minimum} and {maximum} mm.");
+        return value;
     }
 
     private static double FromMm(double mm) => UnitUtils.ConvertToInternalUnits(mm, UnitTypeId.Millimeters);

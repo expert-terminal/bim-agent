@@ -90,6 +90,14 @@ public sealed class BridgeApp : IExtensionApplication
             "create_polylines" => CreatePolylines(doc, request),
             "create_dimension" => CreateDimension(doc, request),
             "create_text" => CreateText(doc, request),
+            "create_mtext" => CreateMText(doc, request),
+            "create_circles" => CreateCircles(doc, request),
+            "create_arcs" => CreateArcs(doc, request),
+            "create_hatches" => CreateHatches(doc, request),
+            "move_entities" => MoveEntities(doc, request),
+            "copy_entities" => CopyEntities(doc, request),
+            "rotate_entities" => RotateEntities(doc, request),
+            "delete_entities" => DeleteEntities(doc, request),
             "create_layer" => CreateLayer(doc, request),
             "create_box" => CreateBox(doc, request),
             _ => throw new ArgumentException($"Unknown action: {action}")
@@ -239,6 +247,218 @@ public sealed class BridgeApp : IExtensionApplication
         var handle = textEntity.Handle.ToString();
         tx.Commit();
         return new { approved = true, handle };
+    }
+
+    private static object CreateCircles(Document doc, JsonElement request)
+    {
+        var specs = request.GetProperty("circles").EnumerateArray().Select(item =>
+        {
+            var center = Point(item.GetProperty("center"));
+            var radius = Positive(item.GetProperty("radius").GetDouble());
+            if (radius > 1_000_000) throw new ArgumentException("Circle radius is over the 1,000,000 drawing-unit limit.");
+            var layer = item.TryGetProperty("layer", out var l) ? l.GetString() : null;
+            return (Center: center, Radius: radius, Layer: layer);
+        }).ToArray();
+        if (specs.Length is < 1 or > 100) throw new ArgumentException("Provide 1 to 100 circles.");
+        if (!Confirm($"Create {specs.Length} circle(s) in {doc.Name}? Coordinates use native drawing units."))
+            return new { approved = false, handles = Array.Empty<string>() };
+        using var tx = doc.Database.TransactionManager.StartTransaction();
+        var blockTable = (BlockTable)tx.GetObject(doc.Database.BlockTableId, OpenMode.ForRead);
+        var model = (BlockTableRecord)tx.GetObject(blockTable[BlockTableRecord.ModelSpace], OpenMode.ForWrite);
+        var layers = (LayerTable)tx.GetObject(doc.Database.LayerTableId, OpenMode.ForRead);
+        var handles = new List<string>();
+        foreach (var spec in specs)
+        {
+            if (spec.Layer is not null && !layers.Has(spec.Layer)) throw new ArgumentException($"Layer '{spec.Layer}' does not exist.");
+            var circle = new Circle(spec.Center, Vector3d.ZAxis, spec.Radius);
+            if (spec.Layer is not null) circle.Layer = spec.Layer;
+            model.AppendEntity(circle);
+            tx.AddNewlyCreatedDBObject(circle, true);
+            handles.Add(circle.Handle.ToString());
+        }
+        tx.Commit();
+        return new { approved = true, handles };
+    }
+
+    private static object CreateMText(Document doc, JsonElement request)
+    {
+        var position = Point(request.GetProperty("position"));
+        var content = request.GetProperty("text").GetString();
+        var height = Positive(request.GetProperty("height").GetDouble());
+        var width = Positive(request.GetProperty("width").GetDouble());
+        if (string.IsNullOrWhiteSpace(content) || content.Length > 8000) throw new ArgumentException("Multiline text must contain 1–8000 characters.");
+        if (!Confirm($"Create multiline text at the supplied point in {doc.Name}? Width and height use native drawing units."))
+            return new { approved = false, handle = (string?)null };
+        using var tx = doc.Database.TransactionManager.StartTransaction();
+        var table = (BlockTable)tx.GetObject(doc.Database.BlockTableId, OpenMode.ForRead);
+        var model = (BlockTableRecord)tx.GetObject(table[BlockTableRecord.ModelSpace], OpenMode.ForWrite);
+        var mtext = new MText { Location = position, TextHeight = height, Width = width, Contents = content };
+        model.AppendEntity(mtext);
+        tx.AddNewlyCreatedDBObject(mtext, true);
+        var handle = mtext.Handle.ToString();
+        tx.Commit();
+        return new { approved = true, handle };
+    }
+
+    private static object CreateHatches(Document doc, JsonElement request)
+    {
+        var specs = request.GetProperty("hatches").EnumerateArray().ToArray();
+        if (specs.Length is < 1 or > 50) throw new ArgumentException("Provide 1 to 50 hatch specifications.");
+        var data = specs.Select(item =>
+        {
+            var handle = item.GetProperty("boundaryHandle").GetString();
+            var pattern = item.GetProperty("pattern").GetString();
+            if (string.IsNullOrWhiteSpace(handle) || handle.Length > 16) throw new ArgumentException("Invalid boundary handle.");
+            if (string.IsNullOrWhiteSpace(pattern) || pattern.Length > 64) throw new ArgumentException("Invalid hatch pattern name.");
+            return (Handle: handle, Pattern: pattern);
+        }).ToArray();
+        if (!Confirm($"Create {data.Length} associative hatch(es) in {doc.Name}? Each boundary must be a closed polyline."))
+            return new { approved = false, handles = Array.Empty<string>() };
+        using var tx = doc.Database.TransactionManager.StartTransaction();
+        var database = doc.Database;
+        var blockTable = (BlockTable)tx.GetObject(database.BlockTableId, OpenMode.ForRead);
+        var model = (BlockTableRecord)tx.GetObject(blockTable[BlockTableRecord.ModelSpace], OpenMode.ForWrite);
+        var handles = new List<string>();
+        foreach (var spec in data)
+        {
+            if (!long.TryParse(spec.Handle, System.Globalization.NumberStyles.HexNumber, null, out var value)) throw new ArgumentException($"Invalid boundary handle '{spec.Handle}'.");
+            var boundaryId = database.GetObjectId(false, new Handle(value), 0);
+            if (!boundaryId.IsValid || tx.GetObject(boundaryId, OpenMode.ForRead) is not Polyline { Closed: true })
+                throw new ArgumentException($"Boundary handle '{spec.Handle}' does not identify a closed polyline.");
+            var hatch = new Hatch();
+            model.AppendEntity(hatch);
+            tx.AddNewlyCreatedDBObject(hatch, true);
+            hatch.SetHatchPattern(HatchPatternType.PreDefined, spec.Pattern);
+            hatch.Associative = true;
+            var loop = new ObjectIdCollection { boundaryId };
+            hatch.AppendLoop(HatchLoopTypes.External, loop);
+            hatch.EvaluateHatch(true);
+            handles.Add(hatch.Handle.ToString());
+        }
+        tx.Commit();
+        return new { approved = true, handles };
+    }
+
+    private static object MoveEntities(Document doc, JsonElement request)
+    {
+        var raw = request.GetProperty("handles").EnumerateArray().Select(x => x.GetString() ?? "").ToArray();
+        if (raw.Length is < 1 or > 100 || raw.Distinct(StringComparer.OrdinalIgnoreCase).Count() != raw.Length) throw new ArgumentException("Provide 1 to 100 distinct entity handles.");
+        var delta = Point(request.GetProperty("delta"));
+        if (delta.DistanceTo(Point3d.Origin) < 1e-9) throw new ArgumentException("Move displacement must be non-zero.");
+        if (!Confirm($"Move {raw.Length} entity/entities in {doc.Name} by the supplied native-unit vector?"))
+            return new { approved = false, handles = raw };
+        using var tx = doc.Database.TransactionManager.StartTransaction();
+        var ids = raw.Select(handle =>
+        {
+            if (!long.TryParse(handle, System.Globalization.NumberStyles.HexNumber, null, out var value)) throw new ArgumentException($"Invalid entity handle '{handle}'.");
+            var id = doc.Database.GetObjectId(false, new Handle(value), 0);
+            if (!id.IsValid || tx.GetObject(id, OpenMode.ForRead) is not Entity) throw new ArgumentException($"Handle '{handle}' does not identify an entity.");
+            return id;
+        }).ToArray();
+        var transform = Matrix3d.Displacement(new Vector3d(delta.X, delta.Y, delta.Z));
+        foreach (var id in ids) ((Entity)tx.GetObject(id, OpenMode.ForWrite)).TransformBy(transform);
+        tx.Commit();
+        return new { approved = true, handles = raw };
+    }
+
+    private static object CopyEntities(Document doc, JsonElement request)
+    {
+        var raw = request.GetProperty("handles").EnumerateArray().Select(x => x.GetString() ?? "").ToArray();
+        if (raw.Length is < 1 or > 100 || raw.Distinct(StringComparer.OrdinalIgnoreCase).Count() != raw.Length) throw new ArgumentException("Provide 1 to 100 distinct entity handles.");
+        var delta = Point(request.GetProperty("delta"));
+        if (delta.DistanceTo(Point3d.Origin) < 1e-9) throw new ArgumentException("Copy displacement must be non-zero.");
+        if (!Confirm($"Copy {raw.Length} entity/entities in {doc.Name} by the supplied native-unit vector?"))
+            return new { approved = false, handles = Array.Empty<string>() };
+        using var tx = doc.Database.TransactionManager.StartTransaction();
+        var table = (BlockTable)tx.GetObject(doc.Database.BlockTableId, OpenMode.ForRead);
+        var model = (BlockTableRecord)tx.GetObject(table[BlockTableRecord.ModelSpace], OpenMode.ForWrite);
+        var transform = Matrix3d.Displacement(new Vector3d(delta.X, delta.Y, delta.Z));
+        var created = new List<string>();
+        foreach (var handle in raw)
+        {
+            if (!long.TryParse(handle, System.Globalization.NumberStyles.HexNumber, null, out var value)) throw new ArgumentException($"Invalid entity handle '{handle}'.");
+            var id = doc.Database.GetObjectId(false, new Handle(value), 0);
+            if (!id.IsValid || tx.GetObject(id, OpenMode.ForRead) is not Entity entity) throw new ArgumentException($"Handle '{handle}' does not identify an entity.");
+            var copy = entity.GetTransformedCopy(transform);
+            model.AppendEntity(copy);
+            tx.AddNewlyCreatedDBObject(copy, true);
+            created.Add(copy.Handle.ToString());
+        }
+        tx.Commit();
+        return new { approved = true, handles = created };
+    }
+
+    private static object RotateEntities(Document doc, JsonElement request)
+    {
+        var raw = request.GetProperty("handles").EnumerateArray().Select(x => x.GetString() ?? "").ToArray();
+        if (raw.Length is < 1 or > 100 || raw.Distinct(StringComparer.OrdinalIgnoreCase).Count() != raw.Length) throw new ArgumentException("Provide 1 to 100 distinct entity handles.");
+        var pivot = Point(request.GetProperty("pivot"));
+        var degrees = request.GetProperty("degrees").GetDouble();
+        if (!double.IsFinite(degrees) || Math.Abs(degrees) > 360_000) throw new ArgumentException("degrees must be finite and within ±360000.");
+        if (Math.Abs(degrees) < 1e-9) throw new ArgumentException("Rotation must be non-zero.");
+        if (!Confirm($"Rotate {raw.Length} entity/entities around the WCS Z axis by {degrees}° in {doc.Name}?"))
+            return new { approved = false, handles = raw };
+        using var tx = doc.Database.TransactionManager.StartTransaction();
+        var ids = raw.Select(handle =>
+        {
+            if (!long.TryParse(handle, System.Globalization.NumberStyles.HexNumber, null, out var value)) throw new ArgumentException($"Invalid entity handle '{handle}'.");
+            var id = doc.Database.GetObjectId(false, new Handle(value), 0);
+            if (!id.IsValid || tx.GetObject(id, OpenMode.ForRead) is not Entity) throw new ArgumentException($"Handle '{handle}' does not identify an entity.");
+            return id;
+        }).ToArray();
+        var transform = Matrix3d.Rotation(degrees * Math.PI / 180.0, Vector3d.ZAxis, pivot);
+        foreach (var id in ids) ((Entity)tx.GetObject(id, OpenMode.ForWrite)).TransformBy(transform);
+        tx.Commit();
+        return new { approved = true, handles = raw };
+    }
+
+    private static object DeleteEntities(Document doc, JsonElement request)
+    {
+        var raw = request.GetProperty("handles").EnumerateArray().Select(x => x.GetString() ?? "").ToArray();
+        if (raw.Length is < 1 or > 100 || raw.Distinct(StringComparer.OrdinalIgnoreCase).Count() != raw.Length) throw new ArgumentException("Provide 1 to 100 distinct entity handles.");
+        if (!Confirm($"Delete {raw.Length} entity/entities from {doc.Name}? AutoCAD Undo can restore committed deletions."))
+            return new { approved = false, handles = raw };
+        using var tx = doc.Database.TransactionManager.StartTransaction();
+        foreach (var handle in raw)
+        {
+            if (!long.TryParse(handle, System.Globalization.NumberStyles.HexNumber, null, out var value)) throw new ArgumentException($"Invalid entity handle '{handle}'.");
+            var id = doc.Database.GetObjectId(false, new Handle(value), 0);
+            if (!id.IsValid || tx.GetObject(id, OpenMode.ForRead) is not Entity entity) throw new ArgumentException($"Handle '{handle}' does not identify an entity.");
+            entity.UpgradeOpen();
+            entity.Erase();
+        }
+        tx.Commit();
+        return new { approved = true, deletedHandles = raw };
+    }
+
+    private static object CreateArcs(Document doc, JsonElement request)
+    {
+        var specs = request.GetProperty("arcs").EnumerateArray().Select(item =>
+        {
+            var center = Point(item.GetProperty("center"));
+            var radius = Positive(item.GetProperty("radius").GetDouble());
+            var start = item.GetProperty("startRadians").GetDouble();
+            var end = item.GetProperty("endRadians").GetDouble();
+            if (!double.IsFinite(start) || !double.IsFinite(end) || end <= start || end - start >= 2 * Math.PI)
+                throw new ArgumentException("Arc angles must be finite, increasing, and span less than 2π radians.");
+            return (Center: center, Radius: radius, Start: start, End: end);
+        }).ToArray();
+        if (specs.Length is < 1 or > 100) throw new ArgumentException("Provide 1 to 100 arcs.");
+        if (!Confirm($"Create {specs.Length} arc(s) in {doc.Name}? Angles are radians; coordinates use native drawing units."))
+            return new { approved = false, handles = Array.Empty<string>() };
+        using var tx = doc.Database.TransactionManager.StartTransaction();
+        var table = (BlockTable)tx.GetObject(doc.Database.BlockTableId, OpenMode.ForRead);
+        var model = (BlockTableRecord)tx.GetObject(table[BlockTableRecord.ModelSpace], OpenMode.ForWrite);
+        var handles = new List<string>();
+        foreach (var spec in specs)
+        {
+            var arc = new Arc(spec.Center, spec.Radius, spec.Start, spec.End);
+            model.AppendEntity(arc);
+            tx.AddNewlyCreatedDBObject(arc, true);
+            handles.Add(arc.Handle.ToString());
+        }
+        tx.Commit();
+        return new { approved = true, handles };
     }
 
     private static object CreateBox(Document doc, JsonElement request)

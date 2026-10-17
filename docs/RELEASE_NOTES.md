@@ -1,4 +1,14 @@
-# v0.3.0-preview
+# v0.4.0-preview
+
+- Revit grew from 45 to 52 tools: drafting, section and elevation views, detail lines, grid dimensions, and group/ungroup operations.
+- AutoCAD grew from 9 to 17 tools: multiline text, circles, arcs, associative hatches, move/copy/rotate, and deletion.
+- SketchUp grew from 16 to 27 tools: planar faces, dimensions, scenes, section planes, camera control, edge paths, circles, arcs, and cylinders.
+- Updated agent instructions, capabilities, tool references and workflow limits for the expanded catalogs.
+- Rebuilt both native extensions. Revit and AutoCAD compile against the installed 2026 SDKs; SketchUp RBZ is packaged. New host operations require interactive validation.
+
+This remains a developer preview. These tools do not generate complete construction documentation or guarantee design/code compliance. See [compatibility](COMPATIBILITY.md), [Revit workflows](REVIT_WORKFLOWS.md), and [tool reference](TOOLS.md).
+
+## v0.3.0-preview
 
 - Expanded the Revit catalog to 45 tools for architecture modeling, family placement, rooms, views, tags, schedules, sheets, PDF/DWG exports, model inspection and edits.
 - Expanded AutoCAD to 9 tools, including polylines, dimensions and text.
