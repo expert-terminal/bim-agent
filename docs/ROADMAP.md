@@ -4,7 +4,7 @@ The goal is natural-language control of a complete BIM workflow through small, t
 
 ## 0.1 — Developer preview (current)
 
-Local MCP and Revit transport, bounded reads, straight wall creation, parameter editing, deletion, Revit approval, transactions and explicit units. Source build for Revit 2026.
+Local MCP and Revit transport, bounded reads, straight wall, level, grid and sheet creation, parameter editing, deletion, Revit approval, transactions and explicit units. Source build for Revit 2026. The new level, grid and sheet tools compile but still need a live write test.
 
 ## 0.2 — Trustworthy modeling workflow
 
@@ -16,7 +16,7 @@ Local MCP and Revit transport, bounded reads, straight wall creation, parameter 
 
 ## 0.3 — Architectural and documentation coverage
 
-Dedicated tools for levels, grids, floors, openings, doors, windows, rooms, roofs, views, sheets, dimensions, tags, schedules and family placement. Each tool will validate required types, hosts, levels, phases and units. Add natural-language workflow examples and reproducible benchmark models.
+Dedicated tools for floors, openings, doors, windows, rooms, roofs, dimensions, tags, schedules and family placement. Each tool will validate required types, hosts, levels, phases and units. Add natural-language workflow examples and reproducible benchmark models.
 
 ## Later — Structural, MEP and coordination
 

@@ -124,10 +124,16 @@ internal sealed class BridgeHandler : IExternalEventHandler
                 .OrderBy(x => x.Elevation).Select(x => new { id = x.Id.Value, name = x.Name, elevationMm = Math.Round(ToMm(x.Elevation), 2) }).ToArray(),
             "wall_types" => new FilteredElementCollector(doc).OfClass(typeof(WallType)).Cast<WallType>()
                 .OrderBy(x => x.Name).Select(x => new { id = x.Id.Value, name = x.Name, kind = x.Kind.ToString() }).ToArray(),
+            "views" => ListViews(doc, request),
+            "sheets" => ListSheets(doc, request),
+            "family_types" => ListFamilyTypes(doc, request),
             "walls" => ListWalls(doc, request),
             "elements" => ListElements(doc, request),
             "element" => InspectElement(doc, request),
             "create_walls" => CreateWalls(doc, request),
+            "create_level" => CreateLevel(doc, request),
+            "create_grid" => CreateGrid(doc, request),
+            "create_sheet" => CreateSheet(doc, request),
             "set_parameter" => SetParameter(doc, request),
             "delete_elements" => DeleteElements(doc, request),
             _ => throw new ArgumentException($"Unknown action: {action}")
@@ -141,6 +147,107 @@ internal sealed class BridgeHandler : IExternalEventHandler
         return walls.Take(limit).Select(w => new { id = w.Id.Value, name = w.Name, typeId = w.GetTypeId().Value,
             levelId = w.LevelId.Value, lengthMm = Math.Round(ToMm(w.get_Parameter(BuiltInParameter.CURVE_ELEM_LENGTH)?.AsDouble() ?? 0), 2) }).ToArray();
     }
+
+    private static int Limit(JsonElement request) => request.TryGetProperty("limit", out var value)
+        ? Math.Clamp(value.GetInt32(), 1, 200) : 50;
+
+    private static object ListViews(Document doc, JsonElement request) =>
+        new FilteredElementCollector(doc).OfClass(typeof(View)).Cast<View>()
+            .Where(v => !v.IsTemplate && v is not ViewSheet)
+            .OrderBy(v => v.Name).Take(Limit(request))
+            .Select(v => new { id = v.Id.Value, name = v.Name, viewType = v.ViewType.ToString(), scale = v.Scale }).ToArray();
+
+    private static object ListSheets(Document doc, JsonElement request) =>
+        new FilteredElementCollector(doc).OfClass(typeof(ViewSheet)).Cast<ViewSheet>()
+            .OrderBy(s => s.SheetNumber).Take(Limit(request))
+            .Select(s => new { id = s.Id.Value, number = s.SheetNumber, name = s.Name, placeholder = s.IsPlaceholder }).ToArray();
+
+    private static object ListFamilyTypes(Document doc, JsonElement request)
+    {
+        var category = request.TryGetProperty("category", out var c) ? c.GetString() : null;
+        return new FilteredElementCollector(doc).OfClass(typeof(FamilySymbol)).Cast<FamilySymbol>()
+            .Where(s => string.IsNullOrWhiteSpace(category) || string.Equals(s.Category?.Name, category, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(s => s.FamilyName).ThenBy(s => s.Name).Take(Limit(request))
+            .Select(s => new { id = s.Id.Value, family = s.FamilyName, name = s.Name, category = s.Category?.Name, active = s.IsActive }).ToArray();
+    }
+
+    private static object CreateLevel(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        var name = RequiredName(request, "name", 100);
+        var elevationMm = request.GetProperty("elevationMm").GetDouble();
+        if (!double.IsFinite(elevationMm) || Math.Abs(elevationMm) > 100_000)
+            throw new ArgumentException("Elevation must be finite and within ±100,000 mm.");
+        if (new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().Any(l => l.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+            throw new ArgumentException("A level with that name already exists.");
+        if (!Confirm(doc, $"Create level '{name}' at {elevationMm} mm?")) return new { approved = false, createdId = (long?)null };
+        using var tx = new Transaction(doc, "Agent: create level");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            var level = Level.Create(doc, FromMm(elevationMm));
+            level.Name = name;
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the level.");
+            return new { approved = true, createdId = (long?)level.Id.Value };
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+    }
+
+    private static object CreateGrid(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        var name = RequiredName(request, "name", 100);
+        var a = Point(request.GetProperty("startMm"));
+        var b = Point(request.GetProperty("endMm"));
+        if (a.DistanceTo(b) < FromMm(100)) throw new ArgumentException("Grid length must be at least 100 mm.");
+        if (new FilteredElementCollector(doc).OfClass(typeof(Grid)).Cast<Grid>().Any(g => g.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+            throw new ArgumentException("A grid with that name already exists.");
+        if (!Confirm(doc, $"Create grid '{name}' from ({ToMm(a.X):0}, {ToMm(a.Y):0}) to ({ToMm(b.X):0}, {ToMm(b.Y):0}) mm?"))
+            return new { approved = false, createdId = (long?)null };
+        using var tx = new Transaction(doc, "Agent: create grid");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            var grid = Grid.Create(doc, Line.CreateBound(a, b));
+            grid.Name = name;
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the grid.");
+            return new { approved = true, createdId = (long?)grid.Id.Value };
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+    }
+
+    private static object CreateSheet(Document doc, JsonElement request)
+    {
+        if (doc.IsReadOnly) throw new InvalidOperationException("The active document is read-only.");
+        var number = RequiredName(request, "number", 50);
+        var name = RequiredName(request, "name", 100);
+        if (new FilteredElementCollector(doc).OfClass(typeof(ViewSheet)).Cast<ViewSheet>().Any(s => s.SheetNumber.Equals(number, StringComparison.OrdinalIgnoreCase)))
+            throw new ArgumentException("A sheet with that number already exists.");
+        if (!Confirm(doc, $"Create sheet {number} — {name} without a title block?"))
+            return new { approved = false, createdId = (long?)null };
+        using var tx = new Transaction(doc, "Agent: create sheet");
+        if (tx.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not start a Revit transaction.");
+        try
+        {
+            var sheet = ViewSheet.Create(doc, ElementId.InvalidElementId);
+            sheet.SheetNumber = number;
+            sheet.Name = name;
+            if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the sheet.");
+            return new { approved = true, createdId = (long?)sheet.Id.Value };
+        }
+        catch { if (tx.HasStarted()) tx.RollBack(); throw; }
+    }
+
+    private static string RequiredName(JsonElement request, string key, int max)
+    {
+        var value = request.GetProperty(key).GetString()?.Trim();
+        if (string.IsNullOrWhiteSpace(value) || value.Length > max || value.Contains('\n'))
+            throw new ArgumentException($"{key} must be 1–{max} characters without a newline.");
+        return value;
+    }
+
+    private static bool Confirm(Document doc, string action) => TaskDialog.Show("BIM-agent",
+        $"{action}\n\nProject: {doc.Title}", TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No) == TaskDialogResult.Yes;
 
     private static object ListElements(Document doc, JsonElement request)
     {

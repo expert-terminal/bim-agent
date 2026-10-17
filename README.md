@@ -11,10 +11,13 @@
 | `revit_status` | Identify the active document, Revit version, and read-only state |
 | `revit_list_levels` | Get level IDs and elevations in millimetres |
 | `revit_list_wall_types` | Get wall type IDs and kinds |
+| `revit_list_views` / `revit_list_sheets` | Discover project views and sheets |
+| `revit_list_family_types` | Discover loadable family types by category |
 | `revit_list_walls` | Inspect a bounded list of walls |
 | `revit_list_elements` | Discover placed elements, optionally by category name |
 | `revit_inspect_element` | Read an element and its instance parameters |
 | `revit_create_walls` | Create a batch of straight basic walls in millimetres |
+| `revit_create_level` / `revit_create_grid` / `revit_create_sheet` | Create core project structure and documentation |
 | `revit_set_parameter` | Edit a writable instance parameter |
 | `revit_delete_elements` | Delete selected elements and report dependent deletions |
 
@@ -85,6 +88,7 @@ The wall tool accepts `[x, y]` endpoints and height in **millimetres**. IDs must
 - [Architecture, transaction behavior, security and limits](docs/ARCHITECTURE.md)
 - [Tool reference](docs/TOOLS.md)
 - [Roadmap and release criteria](docs/ROADMAP.md)
+- [Test status and repeatable smoke test](docs/TESTING.md)
 - [Research and existing projects](STUDY.md)
 - [Contributing](CONTRIBUTING.md)
 

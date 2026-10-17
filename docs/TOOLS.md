@@ -7,10 +7,16 @@ All tools operate on the **active Revit document**. Tool results use JSON. If Re
 | `revit_status` | `{}` | Document title/path, Revit version, read-only flag |
 | `revit_list_levels` | `{}` | Level IDs, names, elevations in mm |
 | `revit_list_wall_types` | `{}` | Wall type IDs, names, kind |
+| `revit_list_views` | Optional `limit` 1–200 | View IDs, names, types and scales |
+| `revit_list_sheets` | Optional `limit` 1–200 | Sheet IDs, numbers, names and placeholder flags |
+| `revit_list_family_types` | Optional `category` and `limit` 1–200 | Family type IDs, names and categories |
 | `revit_list_walls` | Optional `limit` 1–200 | Wall IDs, names, types, levels, lengths in mm |
 | `revit_list_elements` | Optional `category` display name and `limit` 1–200 | Placed element IDs, unique IDs, names, categories, type IDs |
 | `revit_inspect_element` | `elementId` | Element identity and up to 300 instance parameters |
 | `revit_create_walls` | 1–50 wall specifications | Approval state and created IDs |
+| `revit_create_level` | `name`, `elevationMm` | Approval state and created level ID |
+| `revit_create_grid` | `name`, `startMm`, `endMm` | Approval state and created grid ID |
+| `revit_create_sheet` | `number`, `name` | Approval state and created sheet ID; no title block |
 | `revit_set_parameter` | `elementId`, `parameterName`, `value` | Approval state and new raw value |
 | `revit_delete_elements` | 1–20 distinct `elementIds` | Approval state, requested and actually deleted IDs |
 

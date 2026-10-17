@@ -21,5 +21,6 @@ test('MCP initializes, lists tools, and rejects unknown methods', async () => {
   assert.equal(responses[0].result.serverInfo.name, 'bim-agent');
   assert.ok(responses[1].result.tools.some(tool => tool.name === 'revit_create_walls'));
   assert.ok(responses[1].result.tools.some(tool => tool.name === 'revit_inspect_element'));
+  assert.ok(responses[1].result.tools.some(tool => tool.name === 'revit_create_sheet'));
   assert.equal(responses[2].error.code, -32601);
 });
