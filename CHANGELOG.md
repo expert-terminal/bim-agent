@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Preview the IDs and categories of dependent elements before approving a deletion. Compiled against Revit 2026; live test pending.
+- Live-tested level, grid and sheet creation and view, sheet and family-type discovery in Revit 2026.
+
 ## 0.1.0 — Developer preview
 
 - Local stdio MCP server and Revit 2026 add-in over a current-user-only named pipe.

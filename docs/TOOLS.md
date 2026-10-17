@@ -50,7 +50,7 @@ Inspect the element first. `parameterName` must match exactly one parameter on t
 
 ## Delete elements
 
-Deletion can remove dependent elements too. The confirmation dialog warns about this, and the result reports every ID that Revit says it deleted. Inspect the project again after deletion.
+Deletion can remove dependent elements too. The current source previews the affected IDs in a temporary transaction, rolls it back, then presents the affected set in the approval dialog. This preview change is compiled but awaits a live test; the published v0.1.0 binary only warns that dependent elements may be removed. The result reports every ID that Revit says it deleted. Inspect the project again after deletion.
 
 ```json
 {"elementIds": [123456]}

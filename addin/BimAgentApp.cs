@@ -332,8 +332,30 @@ internal sealed class BridgeHandler : IExternalEventHandler
         if (ids.Length is < 1 or > 20 || ids.Distinct().Count() != ids.Length)
             throw new ArgumentException("Provide 1 to 20 distinct element IDs.");
         foreach (var id in ids) if (doc.GetElement(id) is null) throw new ArgumentException($"Element {id.Value} not found.");
-        var summary = $"Delete {ids.Length} requested element(s) from '{doc.Title}'?\n\n" +
-            "Revit may also delete dependent elements. This operation creates one undo entry.\n\nIDs: " + string.Join(", ", ids.Select(x => x.Value));
+        ICollection<ElementId> previewIds;
+        using (var preview = new Transaction(doc, "Agent: preview deletion"))
+        {
+            if (preview.Start() != TransactionStatus.Started) throw new InvalidOperationException("Could not preview deletion.");
+            try
+            {
+                previewIds = doc.Delete(ids);
+                if (preview.RollBack() != TransactionStatus.RolledBack)
+                    throw new InvalidOperationException("Revit could not roll back the deletion preview.");
+            }
+            catch { if (preview.HasStarted()) preview.RollBack(); throw; }
+        }
+        var requested = ids.Select(x => x.Value).ToHashSet();
+        var dependents = previewIds.Where(x => !requested.Contains(x.Value)).ToArray();
+        var details = dependents.Take(8).Select(id =>
+        {
+            var element = doc.GetElement(id);
+            return $"{id.Value}: {element?.Category?.Name ?? "Element"} {element?.Name ?? ""}";
+        });
+        var summary = $"Delete {ids.Length} requested element(s) from '{doc.Title}'?\n" +
+            $"Revit would also delete {dependents.Length} dependent element(s).\n\n" +
+            "Requested IDs: " + string.Join(", ", ids.Select(x => x.Value)) + "\n" +
+            string.Join("\n", details) + (dependents.Length > 8 ? $"\n... and {dependents.Length - 8} more" : "") +
+            "\n\nThis operation creates one undo entry.";
         if (TaskDialog.Show("BIM-agent", summary, TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No) != TaskDialogResult.Yes)
             return new { approved = false, deletedIds = Array.Empty<long>() };
         using var tx = new Transaction(doc, "Agent: delete elements");

@@ -1,6 +1,6 @@
 addin/bin/
 addin/obj/
-build-check/
+build-check*/
 dist/
 node_modules/
 *.user

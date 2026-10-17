@@ -4,7 +4,7 @@ The goal is natural-language control of a complete BIM workflow through small, t
 
 ## 0.1 — Developer preview (current)
 
-Local MCP and Revit transport, bounded reads, straight wall, level, grid and sheet creation, parameter editing, deletion, Revit approval, transactions and explicit units. Source build for Revit 2026. The new level, grid and sheet tools compile but still need a live write test.
+Local MCP and Revit transport, bounded reads, straight wall, level, grid and sheet creation, parameter editing, deletion, Revit approval, transactions and explicit units. Source build for Revit 2026. These tools passed live smoke tests on a disposable Revit project. Dependent-deletion preview is compiled but awaits a live test.
 
 ## 0.2 — Trustworthy modeling workflow
 

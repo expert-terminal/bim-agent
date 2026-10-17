@@ -22,12 +22,13 @@ The automated MCP test checks initialization, tool discovery and method errors. 
 
 - `revit_status` returned the active project, version and read-only state.
 - Consecutive calls listed levels and wall types.
-- The new view, sheet and family-type tools compile, but the running Revit process still had the earlier DLL loaded during the final live check; their live results remain pending.
+- View, sheet and family-type discovery returned results from the live Revit model.
 - Created a 1,000 mm basic wall on L1 after Revit approval; read-back showed the selected type, level, 1,000 mm length and 3,000 mm height.
 - Edited its `Comments` parameter after approval.
 - Deleted that test wall after approval; Revit reported the created ID among deleted IDs.
+- Created a test level, grid and sheet after separate approvals; read back their names and categories; deleted the three requested IDs. Revit reported four additional dependent IDs during cleanup.
 
-The test was on a disposable unsaved `Project1` model. The level, grid and sheet creation tools were added afterward; they compile but require live write checks. Worksharing, read-only documents, other Revit versions and clean-machine installation remain untested.
+The tests were on a disposable unsaved `Project1` model. The follow-up change to preview dependent deletions before approval compiles but has not been live-tested. Worksharing, read-only documents, other Revit versions and clean-machine installation remain untested.
 
 ## Repeatable manual smoke test
 
